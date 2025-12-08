@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Monitor npm dependencies (works with Bun via package.json)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      # Group GitHub Actions SDK updates together
+      github-actions:
+        patterns:
+          - "@actions/*"
+      # Group development dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier"
+          - "jest"
+          - "ts-jest"
+      # Group TypeScript-related updates
+      typescript:
+        patterns:
+          - "typescript"
+          - "@typescript-eslint/*"
+
+  # Monitor GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
