@@ -1,0 +1,3 @@
+# Require approval from Planning Center Engineering team for all changes
+# This ensures external contributors cannot merge without team review
+* @planningcenter/engineering
