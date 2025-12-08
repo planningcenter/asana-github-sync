@@ -7,7 +7,7 @@
  * Matches URLs like: https://app.asana.com/0/1234567890/9876543210
  * Returns the task IDs (last segment): ['9876543210']
  */
-export function extractAsanaTaskIds(body: string | null): string[] {
+export function extractAsanaTaskIds(body: string | undefined): string[] {
   if (!body) {
     return [];
   }

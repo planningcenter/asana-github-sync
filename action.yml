@@ -1,0 +1,36 @@
+name: 'Asana GitHub Sync'
+description: 'Automatically sync GitHub PR states to Asana task custom fields'
+author: 'Planning Center'
+
+branding:
+  icon: 'check-circle'
+  color: 'purple'
+
+inputs:
+  asana_token:
+    description: 'Asana Personal Access Token'
+    required: true
+  github_token:
+    description: 'GitHub token (use secrets.GITHUB_TOKEN)'
+    required: true
+  custom_field_gid:
+    description: 'GID of the Asana custom status field to update'
+    required: true
+  state_on_opened:
+    description: 'State to set when PR is opened'
+    required: false
+    default: 'Ready for Review'
+  state_on_merged:
+    description: 'State to set when PR is merged'
+    required: false
+    default: 'Done'
+
+outputs:
+  tasks_updated:
+    description: 'Number of tasks updated'
+  task_ids:
+    description: 'Comma-separated list of updated task IDs'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
