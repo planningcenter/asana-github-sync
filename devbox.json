@@ -1,0 +1,10 @@
+{
+  "packages": [
+    "bun@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Bun development environment loaded'"
+    ]
+  }
+}

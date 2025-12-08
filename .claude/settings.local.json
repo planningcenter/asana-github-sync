@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "mcp__asana__asana_create_task",
+      "mcp__asana__asana_set_task_dependencies",
+      "mcp__asana__asana_set_task_dependents",
+      "mcp__asana__asana_get_task",
+      "mcp__asana__asana_get_project_sections",
+      "mcp__asana__asana_get_project",
+      "mcp__asana__asana_update_task",
+      "Bash(bun add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
