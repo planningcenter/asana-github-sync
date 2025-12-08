@@ -30037,6 +30037,7 @@ const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 const config_1 = __nccwpck_require__(2973);
 const parser_1 = __nccwpck_require__(7196);
+const types_1 = __nccwpck_require__(8522);
 async function run() {
     try {
         // Read configuration
@@ -30074,23 +30075,36 @@ async function run() {
         if (taskIds.length > 1) {
             core.warning(`Multiple tasks found, only syncing first task: ${taskId}`);
         }
-        // Determine target state based on event
-        let targetState = null;
+        // Determine transition type based on event
+        let transitionType = null;
         if (payload.action === 'opened' && !pr.draft) {
-            targetState = config.stateOnOpened;
+            transitionType = types_1.TransitionType.ON_OPENED;
         }
         else if (payload.action === 'closed' && pr.merged) {
-            targetState = config.stateOnMerged;
+            transitionType = types_1.TransitionType.ON_MERGED;
         }
-        if (!targetState) {
+        if (!transitionType) {
             core.info(`No state transition needed for action: ${payload.action}`);
             return;
+        }
+        // Map transition type to configured state string
+        let targetState = null;
+        switch (transitionType) {
+            case types_1.TransitionType.ON_OPENED:
+                targetState = config.stateOnOpened;
+                break;
+            case types_1.TransitionType.ON_MERGED:
+                targetState = config.stateOnMerged;
+                break;
+            default:
+                break;
         }
         // LOG what we would do (no actual API call yet)
         core.info('');
         core.info('🎯 WOULD UPDATE ASANA:');
         core.info(`   Task ID: ${taskId}`);
         core.info(`   Custom Field GID: ${config.customFieldGid}`);
+        core.info(`   Transition: ${transitionType}`);
         core.info(`   New State: ${targetState}`);
         core.info('');
         // Set outputs
@@ -30139,6 +30153,28 @@ function extractAsanaTaskIds(body) {
     }
     return Array.from(taskIds);
 }
+
+
+/***/ }),
+
+/***/ 8522:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Core type definitions for Asana-GitHub Sync Action
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TransitionType = void 0;
+/**
+ * Types of state transitions supported
+ */
+var TransitionType;
+(function (TransitionType) {
+    TransitionType["ON_OPENED"] = "ON_OPENED";
+    TransitionType["ON_MERGED"] = "ON_MERGED";
+})(TransitionType || (exports.TransitionType = TransitionType = {}));
 
 
 /***/ }),

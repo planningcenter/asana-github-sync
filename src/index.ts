@@ -7,6 +7,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readConfig } from './config';
 import { extractAsanaTaskIds } from './parser';
+import { TransitionType } from './types';
 
 async function run(): Promise<void> {
   try {
@@ -55,18 +56,33 @@ async function run(): Promise<void> {
       core.warning(`Multiple tasks found, only syncing first task: ${taskId}`);
     }
 
-    // Determine target state based on event
-    let targetState: string | null = null;
+    // Determine transition type based on event
+    let transitionType: TransitionType | null = null;
 
     if (payload.action === 'opened' && !pr.draft) {
-      targetState = config.stateOnOpened;
+      transitionType = TransitionType.ON_OPENED;
     } else if (payload.action === 'closed' && pr.merged) {
-      targetState = config.stateOnMerged;
+      transitionType = TransitionType.ON_MERGED;
     }
 
-    if (!targetState) {
+    if (!transitionType) {
       core.info(`No state transition needed for action: ${payload.action}`);
       return;
+    }
+
+    // Map transition type to configured state string
+
+    let targetState = null
+
+    switch(transitionType) {
+        case TransitionType.ON_OPENED:
+            targetState = config.stateOnOpened
+            break
+        case TransitionType.ON_MERGED:
+            targetState = config.stateOnMerged
+            break
+        default:
+            break
     }
 
     // LOG what we would do (no actual API call yet)
@@ -74,6 +90,7 @@ async function run(): Promise<void> {
     core.info('🎯 WOULD UPDATE ASANA:');
     core.info(`   Task ID: ${taskId}`);
     core.info(`   Custom Field GID: ${config.customFieldGid}`);
+    core.info(`   Transition: ${transitionType}`);
     core.info(`   New State: ${targetState}`);
     core.info('');
 
