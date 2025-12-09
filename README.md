@@ -1,5 +1,7 @@
 # Asana GitHub Sync
 
+Hello world!
+
 A GitHub Action that automatically synchronizes pull request states to Asana task custom fields. Keep your Asana tasks in sync with your PR lifecycle—no manual updates required.
 
 ## Problem
