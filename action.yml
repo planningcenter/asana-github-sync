@@ -13,27 +13,15 @@ inputs:
   github_token:
     description: 'GitHub token (use secrets.GITHUB_TOKEN)'
     required: true
-  custom_field_gid:
-    description: 'GID of the Asana custom status field to update'
+  rules:
+    description: 'YAML rules configuration for PR event automation'
     required: true
-  state_on_opened:
-    description: 'State to set when PR is opened'
-    required: false
-    default: 'In Review'
-  state_on_merged:
-    description: 'State to set when PR is merged'
-    required: false
-    default: 'Shipped'
-  mark_complete_on_merge:
-    description: 'Mark the Asana task as completed when PR is merged'
-    required: false
-    default: 'true'
 
 outputs:
-  tasks_updated:
-    description: 'Number of tasks updated'
   task_ids:
-    description: 'Comma-separated list of updated task IDs'
+    description: 'Comma-separated list of task IDs found in PR'
+  field_updates:
+    description: 'Number of field updates applied'
 
 runs:
   using: 'node20'
