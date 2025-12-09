@@ -9,6 +9,7 @@ import { readRulesConfig } from './util/config';
 import { validateRulesConfig } from './rules/validator';
 import { buildRuleContext, executeRules } from './rules/engine';
 import { extractAsanaTaskIds } from './util/parser';
+import { updateTaskFields } from './util/asana';
 
 async function run(): Promise<void> {
   try {
@@ -49,16 +50,34 @@ async function run(): Promise<void> {
 
     core.info(`${fieldUpdates.size} field update(s) to apply`);
 
-    // TODO: Update Asana tasks with field updates
-    // This will be implemented in the next step when we create the field updater
-    core.info('TODO: Apply field updates to Asana tasks');
-    for (const [fieldGid, value] of fieldUpdates.entries()) {
-      core.info(`  - Field ${fieldGid}: "${value}"`);
+    // Update all Asana tasks
+    let successCount = 0;
+    const failedTasks: string[] = [];
+
+    for (const taskId of taskIds) {
+      try {
+        await updateTaskFields(taskId, fieldUpdates, asanaToken);
+        successCount++;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+        failedTasks.push(taskId);
+      }
     }
+
+    // Log summary
+    core.info('');
+    core.info(`=== Update Summary ===`);
+    core.info(`Total tasks: ${taskIds.length}`);
+    core.info(`✓ Successful: ${successCount}`);
+    if (failedTasks.length > 0) {
+      core.info(`✗ Failed: ${failedTasks.length} (${failedTasks.join(', ')})`);
+    }
+    core.info('');
 
     // Set outputs
     core.setOutput('task_ids', taskIds.join(','));
-    core.setOutput('field_updates', fieldUpdates.size.toString());
+    core.setOutput('tasks_updated', successCount.toString());
 
   } catch (error) {
     // NEVER fail the workflow - just log the error

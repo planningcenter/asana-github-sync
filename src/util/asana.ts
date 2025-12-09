@@ -148,7 +148,7 @@ function logApiError(error: unknown, context: string): void {
 }
 
 /**
- * Update an Asana task based on transition type
+ * Update an Asana task based on transition type (v1 compatibility)
  *
  * @param taskId - The Asana task GID
  * @param transitionType - The type of transition (ON_OPENED, ON_MERGED)
@@ -191,4 +191,90 @@ export async function updateTaskStatus(
       core.error(`Unexpected error updating Asana task ${taskId}: ${String(error)}`);
     }
   }
+}
+
+/**
+ * Update Asana task with field updates from rules engine (v2)
+ *
+ * @param taskGid - Task GID to update
+ * @param fieldUpdates - Map of field GID → value (from rules engine)
+ * @param asanaToken - Asana API token
+ */
+export async function updateTaskFields(
+  taskGid: string,
+  fieldUpdates: Map<string, string>,
+  asanaToken: string
+): Promise<void> {
+  const customFields: Record<string, string> = {};
+  const shouldMarkComplete = fieldUpdates.has('__mark_complete');
+
+  // Cache for fetched custom field schemas
+  const fieldSchemaCache = new Map<string, AsanaCustomField>();
+
+  // Process each field update
+  for (const [fieldGid, rawValue] of fieldUpdates.entries()) {
+    if (fieldGid === '__mark_complete') continue;
+
+    try {
+      // Fetch field schema (with caching)
+      let schema = fieldSchemaCache.get(fieldGid);
+      if (!schema) {
+        schema = await fetchCustomField(asanaToken, fieldGid);
+        fieldSchemaCache.set(fieldGid, schema);
+      }
+
+      // For MVP, we only support enum fields
+      if (schema.type !== 'enum') {
+        core.warning(
+          `Field ${fieldGid} is type '${schema.type}', not 'enum'. Only enum fields supported in MVP.`
+        );
+        continue;
+      }
+
+      // Find matching enum option
+      const enumGid = findEnumOption(schema, rawValue, fieldGid);
+      if (!enumGid) {
+        core.error(`Cannot update field ${fieldGid}: value "${rawValue}" not found`);
+        continue;
+      }
+
+      customFields[fieldGid] = enumGid;
+      core.info(`  ✓ Field ${fieldGid} (enum): "${rawValue}" → ${enumGid}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.error(`Skipping field ${fieldGid}: ${errorMessage}`);
+      // Continue with other fields
+    }
+  }
+
+  // Skip if no valid fields
+  if (Object.keys(customFields).length === 0 && !shouldMarkComplete) {
+    core.warning(`No valid fields to update for task ${taskGid}`);
+    return;
+  }
+
+  // Build update payload
+  const updateData: Record<string, unknown> = {
+    custom_fields: customFields,
+  };
+
+  if (shouldMarkComplete) {
+    updateData.completed = true;
+  }
+
+  // Single PUT request
+  core.info(
+    `Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`
+  );
+
+  await withRetry(
+    () =>
+      asanaRequest<AsanaTask>(asanaToken, `/tasks/${taskGid}`, {
+        method: 'PUT',
+        body: JSON.stringify({ data: updateData }),
+      }),
+    `update task ${taskGid}`
+  );
+
+  core.info(`✓ Task ${taskGid} successfully updated`);
 }
