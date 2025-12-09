@@ -30003,6 +30003,7 @@ async function run() {
             return;
         }
         const parseResult = (0, parser_1.extractAsanaTaskIds)(pr.body, payload.changes?.body?.from);
+        core.info(`Found ${parseResult.taskIds.length} Asana task(s): ${parseResult.taskIds.join(', ')}`);
         if (parseResult.changed) {
             core.info('Asana task links changed in PR body');
         }
@@ -30010,7 +30011,6 @@ async function run() {
             core.info('PR body edited but Asana task links unchanged, skipping');
             return;
         }
-        core.info(`Found ${parseResult.taskIds.length} Asana task(s): ${parseResult.taskIds.join(', ')}`);
         // Validate single task for MVP
         const taskValidation = (0, validation_1.validateTaskCount)(parseResult.taskIds.length);
         if (!taskValidation.valid) {
@@ -30237,7 +30237,10 @@ exports.extractAsanaTaskIds = extractAsanaTaskIds;
 const extractIds = (text) => {
     const taskIds = new Set();
     if (text) {
-        const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(\d+)/g;
+        // Supports two formats:
+        // 1. https://app.asana.com/0/0/1211770387762076
+        // 2. https://app.asana.com/1/1202585680506197/project/1207308952015558/task/1210723244258078
+        const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(?:project\/\d+\/task\/)?(\d+)/g;
         let match;
         while ((match = regex.exec(text)) !== null) {
             taskIds.add(match[1]);
@@ -30247,7 +30250,9 @@ const extractIds = (text) => {
 };
 /**
  * Extract Asana task IDs from PR body text
- * Matches URLs like: https://app.asana.com/0/1234567890/9876543210
+ * Supports two URL formats:
+ * - Short: https://app.asana.com/0/1234567890/9876543210
+ * - Long: https://app.asana.com/1/workspace/project/projectId/task/taskId
  *
  * @param body - Current PR body
  * @param previousBody - Optional previous PR body to detect changes

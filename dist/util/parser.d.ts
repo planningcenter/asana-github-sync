@@ -3,7 +3,9 @@
  */
 /**
  * Extract Asana task IDs from PR body text
- * Matches URLs like: https://app.asana.com/0/1234567890/9876543210
+ * Supports two URL formats:
+ * - Short: https://app.asana.com/0/1234567890/9876543210
+ * - Long: https://app.asana.com/1/workspace/project/projectId/task/taskId
  *
  * @param body - Current PR body
  * @param previousBody - Optional previous PR body to detect changes

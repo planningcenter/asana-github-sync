@@ -50,14 +50,14 @@ async function run(): Promise<void> {
 
     const parseResult = extractAsanaTaskIds(pr.body, payload.changes?.body?.from);
 
+    core.info(`Found ${parseResult.taskIds.length} Asana task(s): ${parseResult.taskIds.join(', ')}`);
+
     if (parseResult.changed) {
       core.info('Asana task links changed in PR body');
     } else {
       core.info('PR body edited but Asana task links unchanged, skipping');
       return;
     }
-
-    core.info(`Found ${parseResult.taskIds.length} Asana task(s): ${parseResult.taskIds.join(', ')}`);
 
     // Validate single task for MVP
     const taskValidation = validateTaskCount(parseResult.taskIds.length);
