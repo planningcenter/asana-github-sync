@@ -29922,7 +29922,227 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 2973:
+/***/ 9407:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Entry point for Asana-GitHub Sync Action
+ * MVP: Logs what would be done (no actual Asana API calls yet)
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core = __importStar(__nccwpck_require__(7484));
+const github = __importStar(__nccwpck_require__(3228));
+const config_1 = __nccwpck_require__(2176);
+const parser_1 = __nccwpck_require__(4325);
+const validation_1 = __nccwpck_require__(5709);
+const transition_1 = __nccwpck_require__(2837);
+const asana_1 = __nccwpck_require__(4038);
+async function run() {
+    try {
+        // Read configuration
+        core.info('Reading action configuration...');
+        const config = (0, config_1.readConfig)();
+        core.info(`✓ Configuration loaded`);
+        core.info(`  - Asana token: ${config.asanaToken.substring(0, 3)}...`);
+        core.info(`  - Custom field GID: ${config.customFieldGid}`);
+        core.info(`  - State on opened: ${config.stateOnOpened}`);
+        core.info(`  - State on merged: ${config.stateOnMerged}`);
+        // Get event context
+        const context = github.context;
+        const { eventName, payload } = context;
+        core.info(`Event: ${eventName}, Action: ${payload.action}`);
+        // Only process pull_request events
+        if (eventName !== 'pull_request') {
+            core.info('Not a pull_request event, skipping');
+            return;
+        }
+        const pr = payload.pull_request;
+        if (!pr) {
+            core.warning('No pull_request in payload, skipping');
+            return;
+        }
+        core.info(`PR #${pr.number}: ${pr.title}`);
+        // Skip draft PRs
+        if (pr.draft) {
+            core.info('PR is in draft, skipping. ⚠️ MVP does not support draft mode ⚠️');
+            return;
+        }
+        // Parse Asana task IDs from PR body
+        const taskIds = (0, parser_1.extractAsanaTaskIds)(pr.body);
+        core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
+        // Validate single task for MVP
+        const taskValidation = (0, validation_1.validateTaskCount)(taskIds.length);
+        if (!taskValidation.valid) {
+            if (taskValidation.level === "info") {
+                core.info(taskValidation.reason);
+            }
+            else {
+                core.warning(taskValidation.reason);
+            }
+            return;
+        }
+        const taskId = taskIds[0];
+        // Determine transition type based on event
+        const transitionType = (0, transition_1.determineTransitionType)(payload.action, pr.merged);
+        if (!transitionType) {
+            core.info(`No state transition needed for action: ${payload.action}`);
+            return;
+        }
+        const targetState = (0, transition_1.mapTransitionToState)(transitionType, config);
+        if (!targetState) {
+            core.error(`Failed to map transition type ${transitionType} to state`);
+            return;
+        }
+        // Update Asana task (currently stubbed - just logs)
+        core.info(`Transition: ${transitionType} → ${targetState}`);
+        await (0, asana_1.updateTaskStatus)(taskId, config.customFieldGid, targetState, config.asanaToken);
+        // Set outputs
+        core.setOutput('tasks_updated', '1');
+        core.setOutput('task_ids', taskId);
+    }
+    catch (error) {
+        // NEVER fail the workflow - just log the error
+        if (error instanceof Error) {
+            core.error(`Action error: ${error.message}`);
+        }
+        else {
+            core.error(`Action error: ${String(error)}`);
+        }
+    }
+}
+run();
+
+
+/***/ }),
+
+/***/ 8522:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Core type definitions for Asana-GitHub Sync Action
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TransitionType = void 0;
+/**
+ * Types of state transitions supported
+ */
+var TransitionType;
+(function (TransitionType) {
+    TransitionType["ON_OPENED"] = "ON_OPENED";
+    TransitionType["ON_MERGED"] = "ON_MERGED";
+})(TransitionType || (exports.TransitionType = TransitionType = {}));
+
+
+/***/ }),
+
+/***/ 4038:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Asana API integration
+ * Currently stubbed - logs what would be done instead of making real API calls
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.updateTaskStatus = updateTaskStatus;
+const core = __importStar(__nccwpck_require__(7484));
+/**
+ * Update an Asana task's custom field to a new state
+ *
+ * @param taskId - The Asana task GID
+ * @param customFieldGid - The custom field GID to update
+ * @param stateName - The target state name (e.g., "Ready for Review", "Done")
+ * @param asanaToken - Asana Personal Access Token
+ */
+async function updateTaskStatus(taskId, customFieldGid, stateName, asanaToken) {
+    // TODO: Replace with actual Asana API calls
+    // 1. GET /custom_fields/{customFieldGid} to get enum options
+    // 2. Find enum option where name matches stateName
+    // 3. PUT /tasks/{taskId} with custom_fields: { customFieldGid: enumOptionGid }
+    core.info('');
+    core.info('🎯 WOULD UPDATE ASANA:');
+    core.info(`   Task ID: ${taskId}`);
+    core.info(`   Custom Field GID: ${customFieldGid}`);
+    core.info(`   New State: ${stateName}`);
+    core.info(`   Token: ${asanaToken.substring(0, 10)}...`);
+    core.info('');
+}
+
+
+/***/ }),
+
+/***/ 2176:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -29986,160 +30206,6 @@ function readConfig() {
         stateOnMerged,
     };
 }
-
-
-/***/ }),
-
-/***/ 9407:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-/**
- * Entry point for Asana-GitHub Sync Action
- * MVP: Logs what would be done (no actual Asana API calls yet)
- */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core = __importStar(__nccwpck_require__(7484));
-const github = __importStar(__nccwpck_require__(3228));
-const config_1 = __nccwpck_require__(2973);
-const parser_1 = __nccwpck_require__(4325);
-const validation_1 = __nccwpck_require__(5709);
-const transition_1 = __nccwpck_require__(2837);
-async function run() {
-    try {
-        // Read configuration
-        core.info('Reading action configuration...');
-        const config = (0, config_1.readConfig)();
-        core.info(`✓ Configuration loaded`);
-        core.info(`  - Asana token: ${config.asanaToken.substring(0, 3)}...`);
-        core.info(`  - Custom field GID: ${config.customFieldGid}`);
-        core.info(`  - State on opened: ${config.stateOnOpened}`);
-        core.info(`  - State on merged: ${config.stateOnMerged}`);
-        // Get event context
-        const context = github.context;
-        const { eventName, payload } = context;
-        core.info(`Event: ${eventName}, Action: ${payload.action}`);
-        // Only process pull_request events
-        if (eventName !== 'pull_request') {
-            core.info('Not a pull_request event, skipping');
-            return;
-        }
-        const pr = payload.pull_request;
-        if (!pr) {
-            core.warning('No pull_request in payload, skipping');
-            return;
-        }
-        core.info(`PR #${pr.number}: ${pr.title}`);
-        // Skip draft PRs
-        if (pr.draft) {
-            core.info('PR is in draft, skipping. ⚠️ MVP does not support draft mode ⚠️');
-            return;
-        }
-        // Parse Asana task IDs from PR body
-        const taskIds = (0, parser_1.extractAsanaTaskIds)(pr.body);
-        core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
-        // Validate single task for MVP
-        const taskValidation = (0, validation_1.validateTaskCount)(taskIds.length);
-        if (!taskValidation.valid) {
-            if (taskValidation.level === "info") {
-                core.info(taskValidation.reason);
-            }
-            else {
-                core.warning(taskValidation.reason);
-            }
-            return;
-        }
-        const taskId = taskIds[0];
-        // Determine transition type based on event
-        const transitionType = (0, transition_1.determineTransitionType)(payload.action, pr.merged);
-        if (!transitionType) {
-            core.info(`No state transition needed for action: ${payload.action}`);
-            return;
-        }
-        const targetState = (0, transition_1.mapTransitionToState)(transitionType, config);
-        if (!targetState) {
-            core.error(`Failed to map transition type ${transitionType} to state`);
-            return;
-        }
-        // LOG what we would do (no actual API call yet)
-        core.info('');
-        core.info('🎯 WOULD UPDATE ASANA:');
-        core.info(`   Task ID: ${taskId}`);
-        core.info(`   Custom Field GID: ${config.customFieldGid}`);
-        core.info(`   Transition: ${transitionType}`);
-        core.info(`   New State: ${targetState}`);
-        core.info('');
-        // Set outputs
-        core.setOutput('tasks_updated', '1');
-        core.setOutput('task_ids', taskId);
-    }
-    catch (error) {
-        // NEVER fail the workflow - just log the error
-        if (error instanceof Error) {
-            core.error(`Action error: ${error.message}`);
-        }
-        else {
-            core.error(`Action error: ${String(error)}`);
-        }
-    }
-}
-run();
-
-
-/***/ }),
-
-/***/ 8522:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/**
- * Core type definitions for Asana-GitHub Sync Action
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TransitionType = void 0;
-/**
- * Types of state transitions supported
- */
-var TransitionType;
-(function (TransitionType) {
-    TransitionType["ON_OPENED"] = "ON_OPENED";
-    TransitionType["ON_MERGED"] = "ON_MERGED";
-})(TransitionType || (exports.TransitionType = TransitionType = {}));
 
 
 /***/ }),

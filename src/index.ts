@@ -9,6 +9,7 @@ import { readConfig } from './util/config';
 import { extractAsanaTaskIds } from './util/parser';
 import { validateTaskCount } from './util/validation';
 import { determineTransitionType, mapTransitionToState } from './util/transition';
+import { updateTaskStatus } from './util/asana';
 
 async function run(): Promise<void> {
   try {
@@ -80,14 +81,9 @@ async function run(): Promise<void> {
       return;
     }
 
-    // LOG what we would do (no actual API call yet)
-    core.info('');
-    core.info('🎯 WOULD UPDATE ASANA:');
-    core.info(`   Task ID: ${taskId}`);
-    core.info(`   Custom Field GID: ${config.customFieldGid}`);
-    core.info(`   Transition: ${transitionType}`);
-    core.info(`   New State: ${targetState}`);
-    core.info('');
+    // Update Asana task (currently stubbed - just logs)
+    core.info(`Transition: ${transitionType} → ${targetState}`);
+    await updateTaskStatus(taskId, config.customFieldGid, targetState, config.asanaToken);
 
     // Set outputs
     core.setOutput('tasks_updated', '1');
