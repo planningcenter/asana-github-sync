@@ -16,4 +16,27 @@ jobs:
         with:
           asana_token: ${{ secrets.ASANA_TOKEN }}
           github_token: ${{ github.token }}
-          custom_field_gid: ${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}
+          rules: |
+            rules:
+              - when:
+                  event: pull_request
+                  action: opened
+                then:
+                  update_fields:
+                    '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
+
+              - when:
+                  event: pull_request
+                  action: edited
+                then:
+                  update_fields:
+                    '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
+
+              - when:
+                  event: pull_request
+                  action: closed
+                  merged: true
+                then:
+                  update_fields:
+                    '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'Shipped'
+                  mark_complete: true
