@@ -30036,8 +30036,9 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 const config_1 = __nccwpck_require__(2973);
-const parser_1 = __nccwpck_require__(7196);
-const types_1 = __nccwpck_require__(8522);
+const parser_1 = __nccwpck_require__(4325);
+const validation_1 = __nccwpck_require__(5709);
+const transition_1 = __nccwpck_require__(2837);
 async function run() {
     try {
         // Read configuration
@@ -30063,51 +30064,36 @@ async function run() {
             return;
         }
         core.info(`PR #${pr.number}: ${pr.title}`);
-        // Skip draft PRs entirely
+        // Skip draft PRs
         if (pr.draft) {
             core.info('PR is in draft, skipping. ⚠️ MVP does not support draft mode ⚠️');
             return;
         }
         // Parse Asana task IDs from PR body
         const taskIds = (0, parser_1.extractAsanaTaskIds)(pr.body);
-        if (taskIds.length === 0) {
-            core.info('No Asana task links found in PR body');
-            return;
-        }
         core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
-        // For MVP: only handle single task
-        if (taskIds.length > 1) {
-            core.warning(`Multiple tasks found (${taskIds.length}), skipping sync. ⚠️ MVP only supports single task per PR ⚠️`);
+        // Validate single task for MVP
+        const taskValidation = (0, validation_1.validateTaskCount)(taskIds.length);
+        if (!taskValidation.valid) {
+            if (taskValidation.level === "info") {
+                core.info(taskValidation.reason);
+            }
+            else {
+                core.warning(taskValidation.reason);
+            }
             return;
         }
         const taskId = taskIds[0];
         // Determine transition type based on event
-        let transitionType = null;
-        if (payload.action === 'opened') {
-            transitionType = types_1.TransitionType.ON_OPENED;
-        }
-        else if (payload.action === 'edited' && !pr.merged) {
-            // When PR description is edited and PR is still open, treat as opened
-            transitionType = types_1.TransitionType.ON_OPENED;
-        }
-        else if (payload.action === 'closed' && pr.merged) {
-            transitionType = types_1.TransitionType.ON_MERGED;
-        }
+        const transitionType = (0, transition_1.determineTransitionType)(payload.action, pr.merged);
         if (!transitionType) {
             core.info(`No state transition needed for action: ${payload.action}`);
             return;
         }
-        // Map transition type to configured state string
-        let targetState = null;
-        switch (transitionType) {
-            case types_1.TransitionType.ON_OPENED:
-                targetState = config.stateOnOpened;
-                break;
-            case types_1.TransitionType.ON_MERGED:
-                targetState = config.stateOnMerged;
-                break;
-            default:
-                break;
+        const targetState = (0, transition_1.mapTransitionToState)(transitionType, config);
+        if (!targetState) {
+            core.error(`Failed to map transition type ${transitionType} to state`);
+            return;
         }
         // LOG what we would do (no actual API call yet)
         core.info('');
@@ -30136,7 +30122,29 @@ run();
 
 /***/ }),
 
-/***/ 7196:
+/***/ 8522:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Core type definitions for Asana-GitHub Sync Action
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TransitionType = void 0;
+/**
+ * Types of state transitions supported
+ */
+var TransitionType;
+(function (TransitionType) {
+    TransitionType["ON_OPENED"] = "ON_OPENED";
+    TransitionType["ON_MERGED"] = "ON_MERGED";
+})(TransitionType || (exports.TransitionType = TransitionType = {}));
+
+
+/***/ }),
+
+/***/ 4325:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -30167,24 +30175,84 @@ function extractAsanaTaskIds(body) {
 
 /***/ }),
 
-/***/ 8522:
+/***/ 2837:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/**
+ * Transition logic for determining state changes
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.determineTransitionType = determineTransitionType;
+exports.mapTransitionToState = mapTransitionToState;
+const types_1 = __nccwpck_require__(8522);
+/**
+ * Determine transition type based on PR action and merged status
+ */
+function determineTransitionType(action, merged) {
+    if (action === 'opened') {
+        return types_1.TransitionType.ON_OPENED;
+    }
+    else if (action === 'edited' && !merged) {
+        return types_1.TransitionType.ON_OPENED;
+    }
+    else if (action === 'closed' && merged) {
+        return types_1.TransitionType.ON_MERGED;
+    }
+    else {
+        return null;
+    }
+}
+/**
+ * Map transition type to configured state string
+ */
+function mapTransitionToState(transitionType, config) {
+    switch (transitionType) {
+        case types_1.TransitionType.ON_OPENED:
+            return config.stateOnOpened;
+        case types_1.TransitionType.ON_MERGED:
+            return config.stateOnMerged;
+        default:
+            return null;
+    }
+}
+
+
+/***/ }),
+
+/***/ 5709:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 /**
- * Core type definitions for Asana-GitHub Sync Action
+ * Validation utilities for PR processing
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TransitionType = void 0;
+exports.validateTaskCount = validateTaskCount;
 /**
- * Types of state transitions supported
+ * Check if task count is valid for MVP (single task only)
  */
-var TransitionType;
-(function (TransitionType) {
-    TransitionType["ON_OPENED"] = "ON_OPENED";
-    TransitionType["ON_MERGED"] = "ON_MERGED";
-})(TransitionType || (exports.TransitionType = TransitionType = {}));
+function validateTaskCount(taskCount) {
+    if (taskCount === 0) {
+        return {
+            valid: false,
+            level: "info",
+            reason: 'No Asana task links found in PR body',
+        };
+    }
+    else if (taskCount > 1) {
+        return {
+            valid: false,
+            level: "warning",
+            reason: `Multiple tasks found (${taskCount}), skipping sync. ⚠️ MVP only supports single task per PR ⚠️`,
+        };
+    }
+    else {
+        return { valid: true };
+    }
+}
 
 
 /***/ }),

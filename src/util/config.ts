@@ -3,7 +3,7 @@
  */
 
 import * as core from '@actions/core';
-import { ActionConfig } from './types';
+import { ActionConfig } from '../types';
 
 /**
  * Read and validate action inputs from GitHub Actions context (MVP)

@@ -5,9 +5,10 @@
 
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { readConfig } from './config';
-import { extractAsanaTaskIds } from './parser';
-import { TransitionType } from './types';
+import { readConfig } from './util/config';
+import { extractAsanaTaskIds } from './util/parser';
+import { validateTaskCount } from './util/validation';
+import { determineTransitionType, mapTransitionToState } from './util/transition';
 
 async function run(): Promise<void> {
   try {
@@ -40,7 +41,7 @@ async function run(): Promise<void> {
 
     core.info(`PR #${pr.number}: ${pr.title}`);
 
-    // Skip draft PRs entirely
+    // Skip draft PRs
     if (pr.draft) {
       core.info('PR is in draft, skipping. ⚠️ MVP does not support draft mode ⚠️');
       return;
@@ -49,51 +50,34 @@ async function run(): Promise<void> {
     // Parse Asana task IDs from PR body
     const taskIds = extractAsanaTaskIds(pr.body);
 
-    if (taskIds.length === 0) {
-      core.info('No Asana task links found in PR body');
-      return;
-    }
-
     core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
 
-    // For MVP: only handle single task
-    if (taskIds.length > 1) {
-      core.warning(`Multiple tasks found (${taskIds.length}), skipping sync. ⚠️ MVP only supports single task per PR ⚠️`);
+    // Validate single task for MVP
+    const taskValidation = validateTaskCount(taskIds.length);
+    if (!taskValidation.valid) {
+      if (taskValidation.level === "info") {
+        core.info(taskValidation.reason!);
+      } else {
+        core.warning(taskValidation.reason!);
+      }
       return;
     }
 
     const taskId = taskIds[0];
 
     // Determine transition type based on event
-    let transitionType: TransitionType | null = null;
-
-    if (payload.action === 'opened') {
-      transitionType = TransitionType.ON_OPENED;
-    } else if (payload.action === 'edited' && !pr.merged) {
-      // When PR description is edited and PR is still open, treat as opened
-      transitionType = TransitionType.ON_OPENED;
-    } else if (payload.action === 'closed' && pr.merged) {
-      transitionType = TransitionType.ON_MERGED;
-    }
+    const transitionType = determineTransitionType(payload.action, pr.merged);
 
     if (!transitionType) {
       core.info(`No state transition needed for action: ${payload.action}`);
       return;
     }
 
-    // Map transition type to configured state string
+    const targetState = mapTransitionToState(transitionType, config);
 
-    let targetState = null
-
-    switch(transitionType) {
-        case TransitionType.ON_OPENED:
-            targetState = config.stateOnOpened
-            break
-        case TransitionType.ON_MERGED:
-            targetState = config.stateOnMerged
-            break
-        default:
-            break
+    if (!targetState) {
+      core.error(`Failed to map transition type ${transitionType} to state`);
+      return;
     }
 
     // LOG what we would do (no actual API call yet)
