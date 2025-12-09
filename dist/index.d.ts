@@ -1,5 +1,5 @@
 /**
  * Entry point for Asana-GitHub Sync Action
- * MVP: Logs what would be done (no actual Asana API calls yet)
+ * v2.0: Rules engine with YAML-based configuration
  */
 export {};
