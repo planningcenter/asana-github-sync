@@ -1,7 +1,5 @@
 # asana-github-sync
 
-REMOVE THIS LATER!
-
 To install dependencies:
 
 ```bash
