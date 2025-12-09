@@ -1,6 +1,5 @@
 /**
- * Asana API integration
- * Currently stubbed - logs what would be done instead of making real API calls
+ * Asana API integration using direct HTTP requests
  */
 import { TransitionType, ActionConfig } from '../types';
 /**

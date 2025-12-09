@@ -3449,6 +3449,174 @@ function copyFile(srcFile, destFile, force) {
 
 /***/ }),
 
+/***/ 7552:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.retry = exports.defaultCalculateDelay = exports.sleep = void 0;
+function applyDefaults(options) {
+    if (!options) {
+        options = {};
+    }
+    return {
+        delay: (options.delay === undefined) ? 200 : options.delay,
+        initialDelay: (options.initialDelay === undefined) ? 0 : options.initialDelay,
+        minDelay: (options.minDelay === undefined) ? 0 : options.minDelay,
+        maxDelay: (options.maxDelay === undefined) ? 0 : options.maxDelay,
+        factor: (options.factor === undefined) ? 0 : options.factor,
+        maxAttempts: (options.maxAttempts === undefined) ? 3 : options.maxAttempts,
+        timeout: (options.timeout === undefined) ? 0 : options.timeout,
+        jitter: (options.jitter === true),
+        initialJitter: (options.initialJitter === true),
+        handleError: (options.handleError === undefined) ? null : options.handleError,
+        handleTimeout: (options.handleTimeout === undefined) ? null : options.handleTimeout,
+        beforeAttempt: (options.beforeAttempt === undefined) ? null : options.beforeAttempt,
+        calculateDelay: (options.calculateDelay === undefined) ? null : options.calculateDelay
+    };
+}
+async function sleep(delay) {
+    return new Promise((resolve) => setTimeout(resolve, delay));
+}
+exports.sleep = sleep;
+function defaultCalculateDelay(context, options) {
+    let delay = options.delay;
+    if (delay === 0) {
+        // no delay between attempts
+        return 0;
+    }
+    if (options.factor) {
+        delay *= Math.pow(options.factor, context.attemptNum - 1);
+        if (options.maxDelay !== 0) {
+            delay = Math.min(delay, options.maxDelay);
+        }
+    }
+    if (options.jitter) {
+        // Jitter will result in a random value between `minDelay` and
+        // calculated delay for a given attempt.
+        // See https://www.awsarchitectureblog.com/2015/03/backoff.html
+        // We're using the "full jitter" strategy.
+        const min = Math.ceil(options.minDelay);
+        const max = Math.floor(delay);
+        delay = Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    return Math.round(delay);
+}
+exports.defaultCalculateDelay = defaultCalculateDelay;
+async function retry(attemptFunc, attemptOptions) {
+    const options = applyDefaults(attemptOptions);
+    for (const prop of [
+        'delay',
+        'initialDelay',
+        'minDelay',
+        'maxDelay',
+        'maxAttempts',
+        'timeout'
+    ]) {
+        const value = options[prop];
+        if (!Number.isInteger(value) || (value < 0)) {
+            throw new Error(`Value for ${prop} must be an integer greater than or equal to 0`);
+        }
+    }
+    if ((options.factor.constructor !== Number) || (options.factor < 0)) {
+        throw new Error(`Value for factor must be a number greater than or equal to 0`);
+    }
+    if (options.delay < options.minDelay) {
+        throw new Error(`delay cannot be less than minDelay (delay: ${options.delay}, minDelay: ${options.minDelay}`);
+    }
+    const context = {
+        attemptNum: 0,
+        attemptsRemaining: options.maxAttempts ? options.maxAttempts : -1,
+        aborted: false,
+        abort() {
+            context.aborted = true;
+        }
+    };
+    const calculateDelay = options.calculateDelay || defaultCalculateDelay;
+    async function makeAttempt() {
+        if (options.beforeAttempt) {
+            options.beforeAttempt(context, options);
+        }
+        if (context.aborted) {
+            const err = new Error(`Attempt aborted`);
+            err.code = 'ATTEMPT_ABORTED';
+            throw err;
+        }
+        const onError = async (err) => {
+            if (options.handleError) {
+                await options.handleError(err, context, options);
+            }
+            if (context.aborted || (context.attemptsRemaining === 0)) {
+                throw err;
+            }
+            // We are about to try again so increment attempt number
+            context.attemptNum++;
+            const delay = calculateDelay(context, options);
+            if (delay) {
+                await sleep(delay);
+            }
+            return makeAttempt();
+        };
+        if (context.attemptsRemaining > 0) {
+            context.attemptsRemaining--;
+        }
+        if (options.timeout) {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    if (options.handleTimeout) {
+                        // If calling handleTimeout throws an error that is not wrapped in a promise
+                        // we want to catch the error and reject.
+                        try {
+                            resolve(options.handleTimeout(context, options));
+                        }
+                        catch (e) {
+                            reject(e);
+                        }
+                    }
+                    else {
+                        const err = new Error(`Retry timeout (attemptNum: ${context.attemptNum}, timeout: ${options.timeout})`);
+                        err.code = 'ATTEMPT_TIMEOUT';
+                        reject(err);
+                    }
+                }, options.timeout);
+                attemptFunc(context, options).then((result) => {
+                    clearTimeout(timer);
+                    resolve(result);
+                }).catch((err) => {
+                    clearTimeout(timer);
+                    // Calling resolve with a Promise that rejects here will result
+                    // in an unhandled rejection. Calling `reject` with errors
+                    // does not result in an unhandled rejection
+                    onError(err).then(resolve).catch(reject);
+                });
+            });
+        }
+        else {
+            // No timeout provided so wait indefinitely for the returned promise
+            // to be resolved.
+            return attemptFunc(context, options).catch(onError);
+        }
+    }
+    const initialDelay = options.calculateDelay
+        ? options.calculateDelay(context, options)
+        : options.initialDelay;
+    if (initialDelay) {
+        await sleep(initialDelay);
+    }
+    if (context.attemptNum < 1 && options.initialJitter) {
+        const delay = calculateDelay(context, options);
+        if (delay) {
+            await sleep(delay);
+        }
+    }
+    return makeAttempt();
+}
+exports.retry = retry;
+
+
+/***/ }),
+
 /***/ 7864:
 /***/ ((module) => {
 
@@ -30079,8 +30247,7 @@ var TransitionType;
 "use strict";
 
 /**
- * Asana API integration
- * Currently stubbed - logs what would be done instead of making real API calls
+ * Asana API integration using direct HTTP requests
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -30120,6 +30287,111 @@ exports.updateTaskStatus = updateTaskStatus;
 const core = __importStar(__nccwpck_require__(7484));
 const types_1 = __nccwpck_require__(8522);
 const transition_1 = __nccwpck_require__(2837);
+const retry_1 = __nccwpck_require__(4266);
+const errors_1 = __nccwpck_require__(17);
+const ASANA_API_BASE = 'https://app.asana.com/api/1.0';
+/**
+ * Make an authenticated request to the Asana API
+ *
+ * @param token - Asana Personal Access Token
+ * @param endpoint - API endpoint path (e.g., '/custom_fields/123')
+ * @param options - Fetch options (method, body, etc.)
+ * @returns Parsed JSON response
+ */
+async function asanaRequest(token, endpoint, options = {}) {
+    const response = await fetch(`${ASANA_API_BASE}${endpoint}`, {
+        ...options,
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...options.headers,
+        },
+    });
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new errors_1.ApiError(`Asana API error: ${response.status} ${response.statusText}`, response.status, errorBody);
+    }
+    const json = (await response.json());
+    return json.data;
+}
+/**
+ * Fetch custom field definition from Asana
+ *
+ * @param token - Asana Personal Access Token
+ * @param customFieldGid - Custom field GID
+ * @returns Custom field definition
+ */
+async function fetchCustomField(token, customFieldGid) {
+    core.info(`Fetching custom field ${customFieldGid}...`);
+    return await (0, retry_1.withRetry)(() => asanaRequest(token, `/custom_fields/${customFieldGid}`), `fetch custom field ${customFieldGid}`);
+}
+/**
+ * Find enum option matching the target state name
+ *
+ * @param customField - Custom field definition
+ * @param stateName - Target state name to find
+ * @param customFieldGid - Custom field GID for error messages
+ * @returns Enum option GID, or null if not found
+ */
+function findEnumOption(customField, stateName, customFieldGid) {
+    const enumOptions = customField.enum_options || [];
+    if (enumOptions.length === 0) {
+        core.error(`Custom field ${customFieldGid} has no enum options. It may not be an enum field (type: ${customField.type}).`);
+        return null;
+    }
+    const matchingOption = enumOptions.find((opt) => opt.name === stateName);
+    if (!matchingOption) {
+        core.error(`State "${stateName}" not found in custom field ${customFieldGid}. ` +
+            `Available options: ${enumOptions.map((o) => o.name).join(', ')}`);
+        return null;
+    }
+    return matchingOption.gid;
+}
+/**
+ * Update task with new custom field value and optionally mark complete
+ *
+ * @param token - Asana Personal Access Token
+ * @param taskId - Task GID
+ * @param customFieldGid - Custom field GID
+ * @param enumGid - Enum option GID
+ * @param markComplete - Whether to mark task as complete
+ */
+async function updateTask(token, taskId, customFieldGid, enumGid, markComplete) {
+    const updateData = {
+        custom_fields: {
+            [customFieldGid]: enumGid,
+        },
+    };
+    if (markComplete) {
+        updateData.completed = true;
+    }
+    await (0, retry_1.withRetry)(() => asanaRequest(token, `/tasks/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ data: updateData }),
+    }), `update task ${taskId}`);
+}
+/**
+ * Log error based on HTTP status code
+ *
+ * @param error - The error object
+ * @param context - Context for error message (e.g., 'custom field 123', 'task 456')
+ */
+function logApiError(error, context) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const status = (0, errors_1.isApiError)(error) ? (error.status || error.statusCode) : undefined;
+    if (status === 401 || status === 403) {
+        core.error(`Authentication failed. Check that asana_token is valid and has access to ${context}`);
+    }
+    else if (status === 404) {
+        core.error(`${context} not found. It may have been deleted or you lack access.`);
+    }
+    else if (status === 400) {
+        core.error(`Invalid request for ${context}: ${errorMessage}. This may indicate incomplete dependencies or a bug in the action.`);
+    }
+    else {
+        core.error(`Failed operation for ${context}: ${errorMessage}`);
+    }
+}
 /**
  * Update an Asana task based on transition type
  *
@@ -30133,21 +30405,30 @@ async function updateTaskStatus(taskId, transitionType, config) {
         core.error(`Failed to map transition type ${transitionType} to state`);
         return;
     }
-    // Determine if we should mark the task as complete
     const markComplete = transitionType === types_1.TransitionType.ON_MERGED && config.markCompleteOnMerge;
-    // TODO: Replace with actual Asana API calls
-    // 1. GET /custom_fields/{config.customFieldGid} to get enum options
-    // 2. Find enum option where name matches stateName
-    // 3. PUT /tasks/{taskId} with custom_fields: { customFieldGid: enumOptionGid }
-    //    and optionally completed: true
-    core.info('');
-    core.info('🎯 WOULD UPDATE ASANA:');
-    core.info(`   Task ID: ${taskId}`);
-    core.info(`   Custom Field GID: ${config.customFieldGid}`);
-    core.info(`   New State: ${stateName}`);
-    core.info(`   Mark Complete: ${markComplete ? '✅' : '❌'}`);
-    core.info(`   Token: ${config.asanaToken.substring(0, 10)}...`);
-    core.info('');
+    try {
+        // Fetch custom field definition
+        const customField = await fetchCustomField(config.asanaToken, config.customFieldGid);
+        // Find matching enum option
+        const enumGid = findEnumOption(customField, stateName, config.customFieldGid);
+        if (!enumGid) {
+            core.error(`Cannot update task ${taskId}: state "${stateName}" not found in custom field`);
+            return;
+        }
+        // Update task
+        core.info(`Updating task ${taskId} to state "${stateName}"${markComplete ? ' and marking complete' : ''}...`);
+        await updateTask(config.asanaToken, taskId, config.customFieldGid, enumGid, markComplete);
+        core.info(`✓ Task ${taskId} successfully updated to "${stateName}"`);
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            logApiError(error, `task ${taskId}`);
+            core.debug(error.stack || 'No stack trace available');
+        }
+        else {
+            core.error(`Unexpected error updating Asana task ${taskId}: ${String(error)}`);
+        }
+    }
 }
 
 
@@ -30224,6 +30505,43 @@ function readConfig() {
 
 /***/ }),
 
+/***/ 17:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Custom error types for the action
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ApiError = void 0;
+exports.isApiError = isApiError;
+/**
+ * Custom error class for API errors with status code information
+ */
+class ApiError extends Error {
+    status;
+    statusCode;
+    body;
+    constructor(message, status, body) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.statusCode = status;
+        this.body = body;
+    }
+}
+exports.ApiError = ApiError;
+/**
+ * Type guard to check if error is an ApiError
+ */
+function isApiError(error) {
+    return error instanceof ApiError;
+}
+
+
+/***/ }),
+
 /***/ 4325:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -30271,6 +30589,149 @@ function extractAsanaTaskIds(body, previousBody) {
         return { taskIds: Array.from(taskIds), changed };
     }
     return { taskIds: Array.from(taskIds), changed: true };
+}
+
+
+/***/ }),
+
+/***/ 4266:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Retry utility with exponential backoff for API calls
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.withRetry = withRetry;
+const core = __importStar(__nccwpck_require__(7484));
+const attempt_1 = __nccwpck_require__(7552);
+const errors_1 = __nccwpck_require__(17);
+/**
+ * Retry configuration
+ */
+const RETRY_CONFIG = {
+    maxAttempts: 3,
+    delay: 1000, // 1 second initial delay
+    factor: 2, // 2x exponential backoff
+    maxDelay: 10000, // 10 second cap
+};
+/**
+ * Type guard for errors with status
+ */
+function hasStatus(error) {
+    return typeof error === 'object' && error !== null;
+}
+/**
+ * Determine if an error should be retried
+ *
+ * @param error - The error to classify
+ * @returns true if the error is retryable, false otherwise
+ */
+function isRetryableError(error) {
+    // Handle our custom ApiError
+    if ((0, errors_1.isApiError)(error)) {
+        const status = error.status;
+        // Retry rate limits and server errors
+        if (status === 429 || status >= 500) {
+            return true;
+        }
+        // Don't retry client errors
+        if (status === 400 || status === 401 || status === 403 || status === 404 || status === 409) {
+            return false;
+        }
+    }
+    // Handle other error types with status codes
+    if (!hasStatus(error)) {
+        return false;
+    }
+    // Check for HTTP status codes (direct or nested)
+    const status = error.status || error.statusCode || error.response?.status;
+    if (status) {
+        // Retry rate limits and server errors
+        if (status === 429 || status >= 500) {
+            return true;
+        }
+        // Don't retry client errors
+        if (status === 400 || status === 401 || status === 403 || status === 404 || status === 409) {
+            return false;
+        }
+    }
+    // Check for network errors by error code
+    const code = error?.code || error?.errno;
+    if (code) {
+        const retryableNetworkErrors = ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ENETUNREACH', 'EAI_AGAIN'];
+        if (retryableNetworkErrors.includes(code)) {
+            return true;
+        }
+    }
+    // Default to not retrying unknown errors (fail fast)
+    return false;
+}
+/**
+ * Retry an async operation with exponential backoff
+ *
+ * @param operation - The async operation to retry
+ * @param operationName - Name of the operation for logging
+ * @returns Promise resolving to the operation result
+ * @throws Re-throws the error after max attempts exhausted
+ */
+async function withRetry(operation, operationName) {
+    return (0, attempt_1.retry)(async (context) => {
+        if (context.attemptNum > 1) {
+            core.warning(`Retry attempt ${context.attemptNum}/${RETRY_CONFIG.maxAttempts} for ${operationName}`);
+        }
+        return await operation();
+    }, {
+        delay: RETRY_CONFIG.delay,
+        factor: RETRY_CONFIG.factor,
+        maxDelay: RETRY_CONFIG.maxDelay,
+        maxAttempts: RETRY_CONFIG.maxAttempts,
+        handleError: (error, context) => {
+            const shouldRetry = isRetryableError(error);
+            if (shouldRetry) {
+                const errorMessage = error?.message || String(error);
+                core.warning(`Attempt ${context.attemptNum}/${RETRY_CONFIG.maxAttempts} failed for ${operationName}: ${errorMessage}`);
+            }
+            else {
+                core.debug(`Non-retryable error for ${operationName}: ${JSON.stringify(error)}`);
+                throw error;
+            }
+        },
+    });
 }
 
 
