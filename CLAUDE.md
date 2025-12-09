@@ -219,6 +219,30 @@ npm run all
 - Validate error handling
 - Test with real Asana API
 
+## Code Style Preferences
+
+**Control Flow:**
+- Prefer full if/else blocks to show all branches explicitly instead of early returns when possible
+- Use explicit conditions to make the logic clear
+
+**Example:**
+```typescript
+// Preferred: Full if/else blocks
+if (condition) {
+  // handle true case
+  doSomething();
+} else {
+  // handle false case
+  doSomethingElse();
+}
+
+// Avoid: Early returns when full if/else is clearer
+if (condition) {
+  return;
+}
+doSomething();
+```
+
 ## Important Notes
 
 1. **Never fail PR workflows** - Use `core.error()`, not `core.setFailed()`
