@@ -18,4 +18,5 @@ export interface ActionConfig {
     customFieldGid: string;
     stateOnOpened: string;
     stateOnMerged: string;
+    markCompleteOnMerge: boolean;
 }

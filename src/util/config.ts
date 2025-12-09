@@ -19,11 +19,15 @@ export function readConfig(): ActionConfig {
   const stateOnOpened = core.getInput('state_on_opened') || 'Ready for Review';
   const stateOnMerged = core.getInput('state_on_merged') || 'Done';
 
+  // Boolean inputs (default to true if not specified)
+  const markCompleteOnMerge = core.getBooleanInput('mark_complete_on_merge') !== false;
+
   return {
     asanaToken,
     githubToken,
     customFieldGid,
     stateOnOpened,
     stateOnMerged,
+    markCompleteOnMerge,
   };
 }

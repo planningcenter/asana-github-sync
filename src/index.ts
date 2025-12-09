@@ -8,7 +8,7 @@ import * as github from '@actions/github';
 import { readConfig } from './util/config';
 import { extractAsanaTaskIds } from './util/parser';
 import { validateTaskCount } from './util/validation';
-import { determineTransitionType, mapTransitionToState } from './util/transition';
+import { determineTransitionType } from './util/transition';
 import { updateTaskStatus } from './util/asana';
 
 async function run(): Promise<void> {
@@ -80,16 +80,9 @@ async function run(): Promise<void> {
       return;
     }
 
-    const targetState = mapTransitionToState(transitionType, config);
-
-    if (!targetState) {
-      core.error(`Failed to map transition type ${transitionType} to state`);
-      return;
-    }
-
-    // Update Asana task (currently stubbed - just logs)
-    core.info(`Transition: ${transitionType} → ${targetState}`);
-    await updateTaskStatus(taskId, config.customFieldGid, targetState, config.asanaToken);
+    // Update Asana task
+    core.info(`Transition: ${transitionType}`);
+    await updateTaskStatus(taskId, transitionType, config);
 
     // Set outputs
     core.setOutput('tasks_updated', '1');

@@ -23,4 +23,7 @@ export interface ActionConfig {
   // State mapping (with defaults)
   stateOnOpened: string;
   stateOnMerged: string;
+
+  // Behavior flags
+  markCompleteOnMerge: boolean;
 }

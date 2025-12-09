@@ -24,6 +24,10 @@ inputs:
     description: 'State to set when PR is merged'
     required: false
     default: 'Done'
+  mark_complete_on_merge:
+    description: 'Mark the Asana task as completed when PR is merged'
+    required: false
+    default: 'true'
 
 outputs:
   tasks_updated:

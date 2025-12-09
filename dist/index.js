@@ -30029,14 +30029,9 @@ async function run() {
             core.info(`No state transition needed for action: ${payload.action}`);
             return;
         }
-        const targetState = (0, transition_1.mapTransitionToState)(transitionType, config);
-        if (!targetState) {
-            core.error(`Failed to map transition type ${transitionType} to state`);
-            return;
-        }
-        // Update Asana task (currently stubbed - just logs)
-        core.info(`Transition: ${transitionType} → ${targetState}`);
-        await (0, asana_1.updateTaskStatus)(taskId, config.customFieldGid, targetState, config.asanaToken);
+        // Update Asana task
+        core.info(`Transition: ${transitionType}`);
+        await (0, asana_1.updateTaskStatus)(taskId, transitionType, config);
         // Set outputs
         core.setOutput('tasks_updated', '1');
         core.setOutput('task_ids', taskId);
@@ -30123,25 +30118,35 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.updateTaskStatus = updateTaskStatus;
 const core = __importStar(__nccwpck_require__(7484));
+const types_1 = __nccwpck_require__(8522);
+const transition_1 = __nccwpck_require__(2837);
 /**
- * Update an Asana task's custom field to a new state
+ * Update an Asana task based on transition type
  *
  * @param taskId - The Asana task GID
- * @param customFieldGid - The custom field GID to update
- * @param stateName - The target state name (e.g., "Ready for Review", "Done")
- * @param asanaToken - Asana Personal Access Token
+ * @param transitionType - The type of transition (ON_OPENED, ON_MERGED)
+ * @param config - Action configuration
  */
-async function updateTaskStatus(taskId, customFieldGid, stateName, asanaToken) {
+async function updateTaskStatus(taskId, transitionType, config) {
+    const stateName = (0, transition_1.mapTransitionToState)(transitionType, config);
+    if (!stateName) {
+        core.error(`Failed to map transition type ${transitionType} to state`);
+        return;
+    }
+    // Determine if we should mark the task as complete
+    const markComplete = transitionType === types_1.TransitionType.ON_MERGED && config.markCompleteOnMerge;
     // TODO: Replace with actual Asana API calls
-    // 1. GET /custom_fields/{customFieldGid} to get enum options
+    // 1. GET /custom_fields/{config.customFieldGid} to get enum options
     // 2. Find enum option where name matches stateName
     // 3. PUT /tasks/{taskId} with custom_fields: { customFieldGid: enumOptionGid }
+    //    and optionally completed: true
     core.info('');
     core.info('🎯 WOULD UPDATE ASANA:');
     core.info(`   Task ID: ${taskId}`);
-    core.info(`   Custom Field GID: ${customFieldGid}`);
+    core.info(`   Custom Field GID: ${config.customFieldGid}`);
     core.info(`   New State: ${stateName}`);
-    core.info(`   Token: ${asanaToken.substring(0, 10)}...`);
+    core.info(`   Mark Complete: ${markComplete ? '✅' : '❌'}`);
+    core.info(`   Token: ${config.asanaToken.substring(0, 10)}...`);
     core.info('');
 }
 
@@ -30204,12 +30209,15 @@ function readConfig() {
     // Optional inputs with defaults
     const stateOnOpened = core.getInput('state_on_opened') || 'Ready for Review';
     const stateOnMerged = core.getInput('state_on_merged') || 'Done';
+    // Boolean inputs (default to true if not specified)
+    const markCompleteOnMerge = core.getBooleanInput('mark_complete_on_merge') !== false;
     return {
         asanaToken,
         githubToken,
         customFieldGid,
         stateOnOpened,
         stateOnMerged,
+        markCompleteOnMerge,
     };
 }
 
