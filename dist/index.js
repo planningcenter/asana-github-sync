@@ -30065,7 +30065,7 @@ async function run() {
         core.info(`PR #${pr.number}: ${pr.title}`);
         // Skip draft PRs entirely
         if (pr.draft) {
-            core.info('PR is in draft, skipping');
+            core.info('PR is in draft, skipping. ⚠️ MVP does not support draft mode ⚠️');
             return;
         }
         // Parse Asana task IDs from PR body
@@ -30075,11 +30075,12 @@ async function run() {
             return;
         }
         core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
-        // For MVP: only handle first task
-        const taskId = taskIds[0];
+        // For MVP: only handle single task
         if (taskIds.length > 1) {
-            core.warning(`Multiple tasks found, only syncing first task: ${taskId}`);
+            core.warning(`Multiple tasks found (${taskIds.length}), skipping sync. ⚠️ MVP only supports single task per PR ⚠️`);
+            return;
         }
+        const taskId = taskIds[0];
         // Determine transition type based on event
         let transitionType = null;
         if (payload.action === 'opened') {
