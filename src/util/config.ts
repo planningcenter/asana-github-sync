@@ -16,8 +16,8 @@ export function readConfig(): ActionConfig {
   const customFieldGid = core.getInput('custom_field_gid', { required: true });
 
   // Optional inputs with defaults
-  const stateOnOpened = core.getInput('state_on_opened') || 'Ready for Review';
-  const stateOnMerged = core.getInput('state_on_merged') || 'Done';
+  const stateOnOpened = core.getInput('state_on_opened') || 'In Review';
+  const stateOnMerged = core.getInput('state_on_merged') || 'Shipped';
 
   // Boolean inputs (default to true if not specified)
   const markCompleteOnMerge = core.getBooleanInput('mark_complete_on_merge') !== false;
