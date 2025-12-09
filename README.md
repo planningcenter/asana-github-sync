@@ -137,6 +137,61 @@ https://app.asana.com/1/1202585680506197/project/1207308952015558/task/121072324
 https://app.asana.com/0/0/1211770387762076
 ```
 
+## FAQ
+
+### Will this automatically link my Asana Tasks and GitHub PRs in Asana?
+
+This action **updates task status fields** but does not create the visual "app attachment" widgets that show PR details directly in Asana tasks.
+
+**What this action does:**
+- ✅ Updates the task's Status custom field (e.g., "In Review" → "Shipped")
+- ✅ Marks tasks as complete when PRs are merged
+- ✅ Keeps workflow state in sync automatically
+
+**What this action does NOT do:**
+- ❌ Create rich visual widgets/cards showing PR information in Asana
+- ❌ Display PR status, reviewers, or checks in Asana UI
+
+### Can I get both status updates AND visual widgets?
+
+**Yes!** Use both actions together in your workflow:
+
+```yaml
+name: Asana Integration
+on:
+  pull_request:
+    types: [opened, edited, closed]
+
+jobs:
+  asana-sync:
+    runs-on: ubuntu-latest
+    steps:
+      # Create visual widget in Asana task
+      - uses: Asana/create-app-attachment-github-action@latest
+        with:
+          asana-secret: ${{ secrets.ASANA_OAUTH_SECRET }}
+
+      # Update task status field
+      - uses: planningcenter/asana-github-sync@v1
+        with:
+          asana_token: ${{ secrets.ASANA_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_field_gid: '1202887490284881'
+```
+
+**Setup requirements:**
+
+1. **ASANA_TOKEN** (for asana-github-sync):
+   - Generate at [Asana Developer Console](https://app.asana.com/0/my-apps)
+   - This is a Personal Access Token (PAT)
+
+2. **ASANA_OAUTH_SECRET** (for create-app-attachment):
+   - Generate at [Asana GitHub Integration Platform](https://github.integrations.asana.plus/auth?domainId=ghactions)
+   - This is an OAuth token specific to Asana's GitHub integration
+   - Manage/revoke at [Token Management](https://github.integrations.asana.plus/auth?domainId=manage_tokens)
+
+**Result:** Your Asana tasks will have both a rich visual PR widget AND automatically updated status fields.
+
 ### Error Handling Philosophy
 
 **This action will never fail your PR workflow.** All errors are logged with `core.error()` or `core.warning()` but the action always succeeds. This ensures Asana issues never block code merges.
