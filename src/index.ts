@@ -59,7 +59,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    // Validate single task for MVP
+    // Validate task count
     const taskValidation = validateTaskCount(parseResult.taskIds.length);
     if (!taskValidation.valid) {
       if (taskValidation.level === "info") {
@@ -70,7 +70,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    const taskId = parseResult.taskIds[0];
+    const taskIds = parseResult.taskIds;
 
     // Determine transition type based on event
     const transitionType = determineTransitionType(payload.action, pr.merged);
@@ -80,13 +80,35 @@ async function run(): Promise<void> {
       return;
     }
 
-    // Update Asana task
+    // Update all Asana tasks
     core.info(`Transition: ${transitionType}`);
-    await updateTaskStatus(taskId, transitionType, config);
+    let successCount = 0;
+    const failedTasks: string[] = [];
+
+    for (const taskId of taskIds) {
+      try {
+        await updateTaskStatus(taskId, transitionType, config);
+        successCount++;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+        failedTasks.push(taskId);
+      }
+    }
+
+    // Log summary
+    core.info('');
+    core.info(`=== Update Summary ===`);
+    core.info(`Total tasks: ${taskIds.length}`);
+    core.info(`✓ Successful: ${successCount}`);
+    if (failedTasks.length > 0) {
+      core.info(`✗ Failed: ${failedTasks.length} (${failedTasks.join(', ')})`);
+    }
+    core.info('');
 
     // Set outputs
-    core.setOutput('tasks_updated', '1');
-    core.setOutput('task_ids', taskId);
+    core.setOutput('tasks_updated', successCount.toString());
+    core.setOutput('task_ids', taskIds.join(','));
 
   } catch (error) {
     // NEVER fail the workflow - just log the error

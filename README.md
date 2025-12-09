@@ -14,16 +14,17 @@ This action listens to GitHub pull request events and automatically updates link
 
 ## Features
 
-**MVP (Current Release):**
+**Current Release:**
 - ✅ Automatically updates Asana task status when PR is opened
 - ✅ Automatically updates Asana task status when PR is merged
+- ✅ Supports multiple Asana tasks per PR (updates all linked tasks)
 - ✅ Optionally marks tasks as complete when PR is merged
 - ✅ Extracts Asana task links from PR body (supports both short and long URL formats)
 - ✅ Never fails your PR workflow—errors are logged but don't block merges
 - ✅ Skips updates when PR body edited but Asana links unchanged
+- ✅ Continues updating remaining tasks if one task update fails
 
-**MVP Limitations:**
-- ⚠️ Single task per PR only (multiple tasks will be skipped with a warning)
+**Limitations:**
 - ⚠️ Draft PRs are skipped (draft mode not supported yet)
 - ⚠️ No comment posting when Asana tasks are missing
 - ⚠️ No approval checking for "Ready" state
@@ -90,8 +91,8 @@ jobs:
 
 | Output | Description |
 |--------|-------------|
-| `tasks_updated` | Number of tasks updated (0 or 1 in MVP) |
-| `task_ids` | Comma-separated list of updated task IDs |
+| `tasks_updated` | Number of tasks successfully updated |
+| `task_ids` | Comma-separated list of all task IDs found in PR |
 
 ### Finding Your Custom Field GID
 
@@ -204,15 +205,28 @@ jobs:
 - Task not found
 - Custom field state name not found
 
-## Limitations (MVP)
+### Multiple Tasks
 
-This is the MVP release focused on core functionality. The following limitations will be addressed in future releases:
+**The action now supports multiple Asana tasks per PR!**
 
-1. **Single task only** - PRs with multiple Asana links will be skipped
-2. **No draft support** - Draft PRs are ignored (draft → ready for review not tracked)
-3. **No approval checking** - Future release will add "Ready" state when required approvals met
-4. **No commenting** - Future release will comment on merged PRs without Asana links
-5. **edited events** - Only processes edited events if Asana links changed
+If your PR body contains multiple Asana task links:
+```markdown
+## Related Tasks
+https://app.asana.com/0/0/1211770387762076
+https://app.asana.com/0/0/1211770387762077
+https://app.asana.com/0/0/1211770387762078
+```
+
+All linked tasks will be updated with the same status transition. If one task update fails, the action will log an error and continue updating the remaining tasks. A summary of successes and failures is logged at the end.
+
+## Known Limitations
+
+The following features are planned for future releases:
+
+1. **No draft support** - Draft PRs are ignored (draft → ready for review not tracked)
+2. **No approval checking** - Future release will add "Ready" state when required approvals met
+3. **No commenting** - Future release will comment on merged PRs without Asana links
+4. **edited events** - Only processes edited events if Asana links changed
 
 ## Development
 
@@ -281,7 +295,6 @@ npm test -- --coverage
 - "Ready" state when approvals met
 
 ### Milestone 3: Production Polish
-- Multiple task support
 - Comment posting on merged PRs without Asana links
 - Comprehensive documentation and examples
 

@@ -9,7 +9,7 @@ export type ValidationResult = {
     reason: string;
 };
 /**
- * Check if task count is valid for MVP (single task only)
+ * Check if task count is valid (supports multiple tasks)
  */
 export declare function validateTaskCount(taskCount: number): ValidationResult;
 //# sourceMappingURL=validation.d.ts.map
