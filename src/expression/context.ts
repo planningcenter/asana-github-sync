@@ -40,4 +40,5 @@ export interface HandlebarsContext {
   pr: PRContext;
   event: EventContext;
   label?: LabelContext;
+  comments?: string; // All PR comments concatenated (if fetched)
 }

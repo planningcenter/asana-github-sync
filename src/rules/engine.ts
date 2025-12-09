@@ -27,16 +27,19 @@ export interface RuleContext {
   label?: {
     name: string;
   };
+  comments?: string; // All PR comments concatenated (if fetched)
 }
 
 /**
  * Build rule context from GitHub context
  *
  * @param githubContext - GitHub Actions context
+ * @param comments - Optional PR comments (pre-fetched if needed by caller)
  * @returns Strongly-typed context for rules engine
  */
 export function buildRuleContext(
-  githubContext: Pick<typeof github.context, 'eventName' | 'payload'>
+  githubContext: Pick<typeof github.context, 'eventName' | 'payload'>,
+  comments?: string
 ): RuleContext {
   const { eventName, payload } = githubContext;
   const pr = payload.pull_request;
@@ -65,6 +68,10 @@ export function buildRuleContext(
     context.label = {
       name: payload.label.name,
     };
+  }
+
+  if (comments !== undefined) {
+    context.comments = comments;
   }
 
   return context;
@@ -138,6 +145,7 @@ export function executeRules(rules: Rule[], context: RuleContext): Map<string, s
         action: context.action,
       },
       label: context.label,
+      comments: context.comments,
     };
 
     // Evaluate each field template with Handlebars

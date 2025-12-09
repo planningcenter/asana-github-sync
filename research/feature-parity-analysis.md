@@ -26,8 +26,8 @@ The 6 custom tools break down into 3 patterns:
 | Multiple tasks | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | **✅ YES** |
 | Multiple custom fields | ❌ | ✅ (2 fields) | ❌ | ✅ (any) | Via #4 | ✅ (4 fields) | **✅ YES (unlimited)** |
 | Field types | N/A | Enum only | N/A | Number/Text | Any | Enum | **✅ Enum (MVP)<br/>⏳ Text/Number/Date planned** |
-| Template expressions | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Handlebars 🚀 NEW** |
-| Regex extraction | ❌ | ❌ | ❌ | ✅ Comments | ✅ Comments | ✅ Comments | **⏳ Helpers planned** |
+| Template expressions | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Handlebars 🚀** |
+| Regex extraction | ❌ | ❌ | ❌ | ✅ Comments | ✅ Comments | ✅ Comments | **✅ extract_from_* helpers 🚀 NEW** |
 | Label conditions | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | **✅ `label: 'name'`** |
 | Author filtering | ❌ | ✅ Bot only | ✅ Allowlist | ❌ | ❌ | ❌ | **✅ `{{pr.author}}`** |
 | Draft handling | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ `draft: false`** |
@@ -166,11 +166,11 @@ Features that **NONE** of the 6 custom tools have:
 - ⏳ Date fields (planned for field type system)
 
 **Extraction:**
-- ❌ Regex from PR body (planned as `{{extract_from_body}}` helper)
-- ❌ Regex from PR title (planned as `{{extract_from_title}}` helper)
-- ❌ Regex from comments (planned as `{{extract_from_comments}}` helper)
+- ✅ Regex from PR body (`{{extract_from_body "pattern"}}` helper) 🚀 **NEW**
+- ✅ Regex from PR title (`{{extract_from_title "pattern"}}` helper) 🚀 **NEW**
+- ✅ Regex from comments (`{{extract_from_comments "pattern"}}` helper) 🚀 **NEW**
 
-Tools #4, #5, #6 all parse comments for build numbers. This is planned but not blocking for MVP.
+Tools #4, #5, #6 all parse comments for build numbers. **v2 now supports all three extraction sources with conditional comment fetching!**
 
 #### ❌ **Intentionally Not at Parity:**
 
@@ -235,8 +235,9 @@ None of the bash/curl tools can:
 - Interpolate PR metadata (`{{pr.number}}`)
 - Make decisions based on PR properties
 - Build dynamic field values
+- Extract regex patterns with helpers (`{{extract_from_body "BUILD-(\\d+)"}}`) 🚀 **NEW**
 
-This enables use cases the others can't handle.
+This enables use cases the others can't handle, including the comment parsing that tools #4, #5, and #6 need!
 
 ### 4. Multiple Tasks + Multiple Fields = Critical Gap Closed
 
@@ -272,7 +273,7 @@ v2 uses TypeScript:
 | **Draft → Ready transition** | v2 | `draft: false` condition |
 | **Label added → Trigger update** | v2 | `label: 'build_created'` condition |
 | **Bot PR → Different workflow** | v2 | `{{pr.author}}` template filtering |
-| **Extract build number from comment** | Attempt #4 or #6 | v2 will support with helpers |
+| **Extract build number from comment** | v2 | `{{extract_from_comments "BUILD-(\\d+)"}}` 🚀 **NEW** |
 
 ## Gaps and Roadmap
 
@@ -283,6 +284,7 @@ v2 meets or exceeds the high-priority needs:
 - ✅ Multiple fields
 - ✅ Rules engine
 - ✅ Template expressions
+- ✅ Regex extraction helpers 🚀 **NEW**
 - ✅ Production-grade error handling
 
 ### Milestone 2 (Optional Features) ⏸️
@@ -303,12 +305,7 @@ Based on adoption feedback:
 
 ### Milestone 3 (Advanced Features) ⏸️
 
-1. **Extraction Helpers**
-   - `{{extract_from_body "pattern"}}`
-   - `{{extract_from_title "pattern"}}`
-   - `{{extract_from_comments "pattern"}}`
-
-2. **has_labels Condition**
+1. **has_labels Condition**
    - Match if PR has any of these labels
    - Different from `label` (single label from event)
 
@@ -406,6 +403,7 @@ asana-github-sync v2 **meets or exceeds** all high-priority features from the 6 
 **🏆 Unique to v2:**
 - Rules engine (declarative YAML)
 - Template expressions (Handlebars)
+- Regex extraction helpers (extract_from_body/title/comments) 🚀 **NEW**
 - Never fails workflows
 - Exponential backoff retry
 - TypeScript type safety
@@ -420,8 +418,7 @@ asana-github-sync v2 **meets or exceeds** all high-priority features from the 6 
 - Smart edited handling
 
 **⏳ Partial (Planned):**
-- Field types (enum complete, others planned)
-- Extraction helpers (planned for Milestone 3)
+- Field types (enum complete, text/number/date planned for Milestone 2)
 
 **❌ Intentional Gaps:**
 - Task creation (different pattern, deferred)
@@ -434,14 +431,16 @@ asana-github-sync v2 **meets or exceeds** all high-priority features from the 6 
 
 > "Multiple tasks and multiple fields were the critical gaps, and v2 now has both!"
 
+**Plus regex extraction is now complete**, matching the comment-parsing capabilities of tools #4, #5, and #6!
+
 Teams should:
 1. ✅ **Adopt v2 immediately** for status sync
 2. ✅ **Keep task creators** if needed (composition)
-3. ✅ **Migrate from Attempt #6** (v2 is superior)
-4. ✅ **Replace Attempt #4/#5** (v2 has better foundation)
+3. ✅ **Migrate from Attempt #6** (v2 is superior - includes extraction!)
+4. ✅ **Replace Attempt #4/#5** (v2 has better foundation + extraction!)
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** 2025-12-09
-**Status:** v2 MVP Complete, In Production
+**Status:** v2 MVP Complete + Regex Extraction Helpers, In Production

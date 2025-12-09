@@ -10,9 +10,15 @@ import { validateRulesConfig } from './rules/validator';
 import { buildRuleContext, executeRules } from './rules/engine';
 import { extractAsanaTaskIds } from './util/parser';
 import { updateTaskFields } from './util/asana';
+import { registerHelpers } from './expression/helpers';
+import { rulesUseHelper } from './util/template-analysis';
+import { fetchPRComments } from './util/github';
 
 async function run(): Promise<void> {
   try {
+    // Register Handlebars helpers for template evaluation
+    registerHelpers();
+
     // Read and validate rules configuration
     core.info('Reading rules configuration...');
     const { asanaToken, githubToken, rules } = readRulesConfig();
@@ -24,8 +30,24 @@ async function run(): Promise<void> {
     core.info(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
     core.info(`  - Rules: ${rules.rules.length} rule(s) configured`);
 
+    // Check if any rule uses extract_from_comments helper
+    const needsComments = rulesUseHelper(rules.rules, 'extract_from_comments');
+    let comments: string | undefined;
+
+    if (needsComments) {
+      core.info('Rules use extract_from_comments, fetching PR comments...');
+      const prNumber = github.context.payload.pull_request?.number;
+
+      if (prNumber) {
+        comments = await fetchPRComments(githubToken, prNumber);
+      } else {
+        core.warning('No PR number found in payload, cannot fetch comments');
+        comments = '';
+      }
+    }
+
     // Build rule context from GitHub event
-    const context = buildRuleContext(github.context);
+    const context = buildRuleContext(github.context, comments);
 
     core.info(`Event: ${context.eventName}, Action: ${context.action}`);
     core.info(`PR #${context.pr.number}: ${context.pr.title}`);
