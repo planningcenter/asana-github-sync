@@ -30063,6 +30063,11 @@ async function run() {
             return;
         }
         core.info(`PR #${pr.number}: ${pr.title}`);
+        // Skip draft PRs entirely
+        if (pr.draft) {
+            core.info('PR is in draft, skipping');
+            return;
+        }
         // Parse Asana task IDs from PR body
         const taskIds = (0, parser_1.extractAsanaTaskIds)(pr.body);
         if (taskIds.length === 0) {
@@ -30077,7 +30082,11 @@ async function run() {
         }
         // Determine transition type based on event
         let transitionType = null;
-        if (payload.action === 'opened' && !pr.draft) {
+        if (payload.action === 'opened') {
+            transitionType = types_1.TransitionType.ON_OPENED;
+        }
+        else if (payload.action === 'edited' && !pr.merged) {
+            // When PR description is edited and PR is still open, treat as opened
             transitionType = types_1.TransitionType.ON_OPENED;
         }
         else if (payload.action === 'closed' && pr.merged) {
