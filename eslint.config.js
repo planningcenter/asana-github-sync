@@ -4,7 +4,7 @@ const jestPlugin = require('eslint-plugin-jest');
 
 module.exports = [
   {
-    files: ['src/**/*.ts', '__tests__/**/*.ts'],
+    files: ['src/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -14,8 +14,7 @@ module.exports = [
       }
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      'jest': jestPlugin
+      '@typescript-eslint': tsPlugin
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
@@ -27,8 +26,23 @@ module.exports = [
   },
   {
     files: ['__tests__/**/*.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module'
+      }
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+      'jest': jestPlugin
+    },
     rules: {
-      ...jestPlugin.configs.recommended.rules
+      ...tsPlugin.configs.recommended.rules,
+      ...jestPlugin.configs.recommended.rules,
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
     }
   }
 ];
