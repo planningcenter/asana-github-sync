@@ -30179,7 +30179,7 @@ async function run() {
             core.info('PR body edited but Asana task links unchanged, skipping');
             return;
         }
-        // Validate single task for MVP
+        // Validate task count
         const taskValidation = (0, validation_1.validateTaskCount)(parseResult.taskIds.length);
         if (!taskValidation.valid) {
             if (taskValidation.level === "info") {
@@ -30190,19 +30190,40 @@ async function run() {
             }
             return;
         }
-        const taskId = parseResult.taskIds[0];
+        const taskIds = parseResult.taskIds;
         // Determine transition type based on event
         const transitionType = (0, transition_1.determineTransitionType)(payload.action, pr.merged);
         if (!transitionType) {
             core.info(`No state transition needed for action: ${payload.action}`);
             return;
         }
-        // Update Asana task
+        // Update all Asana tasks
         core.info(`Transition: ${transitionType}`);
-        await (0, asana_1.updateTaskStatus)(taskId, transitionType, config);
+        let successCount = 0;
+        const failedTasks = [];
+        for (const taskId of taskIds) {
+            try {
+                await (0, asana_1.updateTaskStatus)(taskId, transitionType, config);
+                successCount++;
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+                failedTasks.push(taskId);
+            }
+        }
+        // Log summary
+        core.info('');
+        core.info(`=== Update Summary ===`);
+        core.info(`Total tasks: ${taskIds.length}`);
+        core.info(`✓ Successful: ${successCount}`);
+        if (failedTasks.length > 0) {
+            core.info(`✗ Failed: ${failedTasks.length} (${failedTasks.join(', ')})`);
+        }
+        core.info('');
         // Set outputs
-        core.setOutput('tasks_updated', '1');
-        core.setOutput('task_ids', taskId);
+        core.setOutput('tasks_updated', successCount.toString());
+        core.setOutput('task_ids', taskIds.join(','));
     }
     catch (error) {
         // NEVER fail the workflow - just log the error
@@ -30794,7 +30815,7 @@ function mapTransitionToState(transitionType, config) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.validateTaskCount = validateTaskCount;
 /**
- * Check if task count is valid for MVP (single task only)
+ * Check if task count is valid (supports multiple tasks)
  */
 function validateTaskCount(taskCount) {
     if (taskCount === 0) {
@@ -30802,13 +30823,6 @@ function validateTaskCount(taskCount) {
             valid: false,
             level: "info",
             reason: 'No Asana task links found in PR body',
-        };
-    }
-    else if (taskCount > 1) {
-        return {
-            valid: false,
-            level: "warning",
-            reason: `Multiple tasks found (${taskCount}), skipping sync. ⚠️ MVP only supports single task per PR ⚠️`,
         };
     }
     else {
