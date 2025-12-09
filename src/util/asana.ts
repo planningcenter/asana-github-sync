@@ -3,10 +3,9 @@
  */
 
 import * as core from '@actions/core';
-import { TransitionType, ActionConfig, AsanaCustomField, AsanaEnumOption, AsanaTask } from '../types';
-import { mapTransitionToState } from './transition';
+import { AsanaCustomField, AsanaEnumOption, AsanaTask } from '../types';
 import { withRetry } from './retry';
-import { ApiError, isApiError } from './errors';
+import { ApiError } from './errors';
 
 const ASANA_API_BASE = 'https://app.asana.com/api/1.0';
 
@@ -85,112 +84,6 @@ function findEnumOption(customField: AsanaCustomField, stateName: string, custom
   }
 
   return matchingOption.gid;
-}
-
-/**
- * Update task with new custom field value and optionally mark complete
- *
- * @param token - Asana Personal Access Token
- * @param taskId - Task GID
- * @param customFieldGid - Custom field GID
- * @param enumGid - Enum option GID
- * @param markComplete - Whether to mark task as complete
- */
-async function updateTask(
-  token: string,
-  taskId: string,
-  customFieldGid: string,
-  enumGid: string,
-  markComplete: boolean
-): Promise<void> {
-  const updateData: Record<string, unknown> = {
-    custom_fields: {
-      [customFieldGid]: enumGid,
-    },
-  };
-
-  if (markComplete) {
-    updateData.completed = true;
-  }
-
-  await withRetry(
-    () =>
-      asanaRequest<AsanaTask>(token, `/tasks/${taskId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ data: updateData }),
-      }),
-    `update task ${taskId}`
-  );
-}
-
-
-/**
- * Log error based on HTTP status code
- *
- * @param error - The error object
- * @param context - Context for error message (e.g., 'custom field 123', 'task 456')
- */
-function logApiError(error: unknown, context: string): void {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const status = isApiError(error) ? (error.status || error.statusCode) : undefined;
-
-  if (status === 401 || status === 403) {
-    core.error(`Authentication failed. Check that asana_token is valid and has access to ${context}`);
-  } else if (status === 404) {
-    core.error(`${context} not found. It may have been deleted or you lack access.`);
-  } else if (status === 400) {
-    core.error(
-      `Invalid request for ${context}: ${errorMessage}. This may indicate incomplete dependencies or a bug in the action.`
-    );
-  } else {
-    core.error(`Failed operation for ${context}: ${errorMessage}`);
-  }
-}
-
-/**
- * Update an Asana task based on transition type (v1 compatibility)
- *
- * @param taskId - The Asana task GID
- * @param transitionType - The type of transition (ON_OPENED, ON_MERGED)
- * @param config - Action configuration
- */
-export async function updateTaskStatus(
-  taskId: string,
-  transitionType: TransitionType,
-  config: ActionConfig
-): Promise<void> {
-  const stateName = mapTransitionToState(transitionType, config);
-
-  if (!stateName) {
-    core.error(`Failed to map transition type ${transitionType} to state`);
-    return;
-  }
-
-  const markComplete = transitionType === TransitionType.ON_MERGED && config.markCompleteOnMerge;
-
-  try {
-    // Fetch custom field definition
-    const customField = await fetchCustomField(config.asanaToken, config.customFieldGid);
-
-    // Find matching enum option
-    const enumGid = findEnumOption(customField, stateName, config.customFieldGid);
-    if (!enumGid) {
-      core.error(`Cannot update task ${taskId}: state "${stateName}" not found in custom field`);
-      return;
-    }
-
-    // Update task
-    core.info(`Updating task ${taskId} to state "${stateName}"${markComplete ? ' and marking complete' : ''}...`);
-    await updateTask(config.asanaToken, taskId, config.customFieldGid, enumGid, markComplete);
-    core.info(`✓ Task ${taskId} successfully updated to "${stateName}"`);
-  } catch (error) {
-    if (error instanceof Error) {
-      logApiError(error, `task ${taskId}`);
-      core.debug(error.stack || 'No stack trace available');
-    } else {
-      core.error(`Unexpected error updating Asana task ${taskId}: ${String(error)}`);
-    }
-  }
 }
 
 /**
