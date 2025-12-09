@@ -48,13 +48,19 @@ async function run(): Promise<void> {
       return;
     }
 
-    // Parse Asana task IDs from PR body
-    const taskIds = extractAsanaTaskIds(pr.body);
+    const parseResult = extractAsanaTaskIds(pr.body, payload.changes?.body?.from);
 
-    core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
+    if (parseResult.changed) {
+      core.info('Asana task links changed in PR body');
+    } else {
+      core.info('PR body edited but Asana task links unchanged, skipping');
+      return;
+    }
+
+    core.info(`Found ${parseResult.taskIds.length} Asana task(s): ${parseResult.taskIds.join(', ')}`);
 
     // Validate single task for MVP
-    const taskValidation = validateTaskCount(taskIds.length);
+    const taskValidation = validateTaskCount(parseResult.taskIds.length);
     if (!taskValidation.valid) {
       if (taskValidation.level === "info") {
         core.info(taskValidation.reason!);
@@ -64,7 +70,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    const taskId = taskIds[0];
+    const taskId = parseResult.taskIds[0];
 
     // Determine transition type based on event
     const transitionType = determineTransitionType(payload.action, pr.merged);

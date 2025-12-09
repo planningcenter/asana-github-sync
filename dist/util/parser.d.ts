@@ -4,7 +4,13 @@
 /**
  * Extract Asana task IDs from PR body text
  * Matches URLs like: https://app.asana.com/0/1234567890/9876543210
- * Returns the task IDs (last segment): ['9876543210']
+ *
+ * @param body - Current PR body
+ * @param previousBody - Optional previous PR body to detect changes
+ * @returns Object with taskIds array and optional changed flag
  */
-export declare function extractAsanaTaskIds(body: string | undefined): string[];
+export declare function extractAsanaTaskIds(body: string | undefined, previousBody?: string | undefined): {
+    taskIds: string[];
+    changed: boolean;
+};
 //# sourceMappingURL=parser.d.ts.map

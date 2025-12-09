@@ -30002,11 +30002,17 @@ async function run() {
             core.info('PR is in draft, skipping. ⚠️ MVP does not support draft mode ⚠️');
             return;
         }
-        // Parse Asana task IDs from PR body
-        const taskIds = (0, parser_1.extractAsanaTaskIds)(pr.body);
-        core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
+        const parseResult = (0, parser_1.extractAsanaTaskIds)(pr.body, payload.changes?.body?.from);
+        if (parseResult.changed) {
+            core.info('Asana task links changed in PR body');
+        }
+        else {
+            core.info('PR body edited but Asana task links unchanged, skipping');
+            return;
+        }
+        core.info(`Found ${parseResult.taskIds.length} Asana task(s): ${parseResult.taskIds.join(', ')}`);
         // Validate single task for MVP
-        const taskValidation = (0, validation_1.validateTaskCount)(taskIds.length);
+        const taskValidation = (0, validation_1.validateTaskCount)(parseResult.taskIds.length);
         if (!taskValidation.valid) {
             if (taskValidation.level === "info") {
                 core.info(taskValidation.reason);
@@ -30016,7 +30022,7 @@ async function run() {
             }
             return;
         }
-        const taskId = taskIds[0];
+        const taskId = parseResult.taskIds[0];
         // Determine transition type based on event
         const transitionType = (0, transition_1.determineTransitionType)(payload.action, pr.merged);
         if (!transitionType) {
@@ -30220,22 +30226,38 @@ function readConfig() {
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.extractAsanaTaskIds = extractAsanaTaskIds;
+const extractIds = (text) => {
+    const taskIds = new Set();
+    if (text) {
+        const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(\d+)/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            taskIds.add(match[1]);
+        }
+    }
+    return taskIds;
+};
 /**
  * Extract Asana task IDs from PR body text
  * Matches URLs like: https://app.asana.com/0/1234567890/9876543210
- * Returns the task IDs (last segment): ['9876543210']
+ *
+ * @param body - Current PR body
+ * @param previousBody - Optional previous PR body to detect changes
+ * @returns Object with taskIds array and optional changed flag
  */
-function extractAsanaTaskIds(body) {
-    if (!body) {
-        return [];
+function extractAsanaTaskIds(body, previousBody) {
+    const taskIds = extractIds(body);
+    // If previousBody provided, check if task IDs changed
+    if (previousBody !== undefined) {
+        const previousTaskIds = extractIds(previousBody);
+        const oldSet = new Set(previousTaskIds);
+        const newSet = new Set(taskIds);
+        // Check if sets are different
+        const changed = oldSet.size !== newSet.size ||
+            Array.from(oldSet).some(id => !newSet.has(id));
+        return { taskIds: Array.from(taskIds), changed };
     }
-    const taskIds = new Set();
-    const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(\d+)/g;
-    let match;
-    while ((match = regex.exec(body)) !== null) {
-        taskIds.add(match[1]);
-    }
-    return Array.from(taskIds);
+    return { taskIds: Array.from(taskIds), changed: true };
 }
 
 
