@@ -214,14 +214,4 @@ function validateCreateTaskAction(action: CreateTaskAction, ruleIndex: number): 
       }
     }
   }
-
-  // Validate remove_followers
-  if (action.remove_followers !== undefined) {
-    if (!Array.isArray(action.remove_followers)) {
-      throw new Error(`${prefix}.remove_followers must be an array`);
-    }
-    if (action.remove_followers.length === 0) {
-      throw new Error(`${prefix}.remove_followers cannot be empty`);
-    }
-  }
 }

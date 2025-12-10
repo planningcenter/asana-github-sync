@@ -23,17 +23,23 @@ export function readRulesConfig(): {
   const githubToken = core.getInput('github_token', { required: true });
   const rulesYaml = core.getInput('rules', { required: true });
 
-  // Parse optional user mappings (JSON string)
+  // Parse optional user mappings (YAML or JSON string)
   const userMappingsInput = core.getInput('user_mappings');
   let userMappings: Record<string, string> = {};
 
   if (userMappingsInput) {
     try {
-      userMappings = JSON.parse(userMappingsInput);
-      core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
+      // Try YAML first (supports both YAML and JSON since JSON is valid YAML)
+      const parsed = yaml.load(userMappingsInput);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        userMappings = parsed as Record<string, string>;
+        core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
+      } else {
+        throw new Error('user_mappings must be an object/map');
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Invalid user_mappings JSON: ${errorMessage}`);
+      throw new Error(`Invalid user_mappings YAML: ${errorMessage}`);
     }
   }
 

@@ -37,7 +37,6 @@ jobs:
                       </body>
                     initial_fields:
                       '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
-                    remove_followers: ['me']
 
               # Update existing task when PR opened
               - when:

@@ -100,5 +100,16 @@ export function registerHelpers(): void {
     return mappings[githubUsername] || ''; // Empty string if not found
   });
 
+  // Helper: Logical OR - returns first truthy value
+  Handlebars.registerHelper('or', function (...args: unknown[]) {
+    // Handlebars passes options as last argument, so exclude it
+    const values = args.slice(0, -1);
+
+    for (const value of values) {
+      if (value) return value;
+    }
+    return '';
+  });
+
   core.debug('Handlebars helpers registered');
 }

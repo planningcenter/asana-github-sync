@@ -115,15 +115,13 @@ export async function createTask(
 
   core.info(`✓ Task created: ${taskGid}`);
 
-  // Remove followers if specified
-  if (action.remove_followers && action.remove_followers.length > 0) {
-    try {
-      await removeTaskFollowers(taskGid, action.remove_followers, asanaToken);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.warning(`Failed to remove followers from task ${taskGid}: ${errorMessage}`);
-      // Not a critical failure
-    }
+  // Always remove 'me' (the integration user) as a follower to avoid notification noise
+  try {
+    await removeTaskFollowers(taskGid, ['me'], asanaToken);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    core.warning(`Failed to remove integration user as follower from task ${taskGid}: ${errorMessage}`);
+    // Not a critical failure
   }
 
   // Always attach PR via integration if secret is provided

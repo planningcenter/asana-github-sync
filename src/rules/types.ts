@@ -28,7 +28,7 @@ export interface CreateTaskAction {
   html_notes?: string; // Optional: HTML formatted notes (template string, mutually exclusive with notes)
   assignee?: string; // Optional: Assignee user GID or "me" (template string)
   initial_fields?: Record<string, string>; // Optional: Initial custom field values (field GID → template)
-  remove_followers?: string[]; // Optional: Followers to remove after creation (e.g., ["me"])
+  // Note: The integration user ('me') is always removed as a follower after task creation
 }
 
 /**

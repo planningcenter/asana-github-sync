@@ -42796,6 +42796,16 @@ function registerHelpers() {
         const mappings = this.userMappings || {};
         return mappings[githubUsername] || ''; // Empty string if not found
     });
+    // Helper: Logical OR - returns first truthy value
+    handlebars_1.default.registerHelper('or', function (...args) {
+        // Handlebars passes options as last argument, so exclude it
+        const values = args.slice(0, -1);
+        for (const value of values) {
+            if (value)
+                return value;
+        }
+        return '';
+    });
     core.debug('Handlebars helpers registered');
 }
 
@@ -43088,6 +43098,7 @@ function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) 
             merged: pr.merged || false,
             draft: pr.draft || false,
             author: pr.user.login,
+            assignee: pr.assignee?.login, // Optional: may be undefined
             base_ref: pr.base.ref,
             head_ref: pr.head.ref,
             url: pr.html_url || '',
@@ -43524,15 +43535,6 @@ function validateCreateTaskAction(action, ruleIndex) {
             }
         }
     }
-    // Validate remove_followers
-    if (action.remove_followers !== undefined) {
-        if (!Array.isArray(action.remove_followers)) {
-            throw new Error(`${prefix}.remove_followers must be an array`);
-        }
-        if (action.remove_followers.length === 0) {
-            throw new Error(`${prefix}.remove_followers cannot be empty`);
-        }
-    }
 }
 
 
@@ -43691,16 +43693,14 @@ async function createTask(spec, asanaToken, integrationSecret, prMetadata) {
     const taskGid = task.gid;
     const taskUrl = task.permalink_url || `https://app.asana.com/0/${action.project}/${taskGid}`;
     core.info(`✓ Task created: ${taskGid}`);
-    // Remove followers if specified
-    if (action.remove_followers && action.remove_followers.length > 0) {
-        try {
-            await removeTaskFollowers(taskGid, action.remove_followers, asanaToken);
-        }
-        catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            core.warning(`Failed to remove followers from task ${taskGid}: ${errorMessage}`);
-            // Not a critical failure
-        }
+    // Always remove 'me' (the integration user) as a follower to avoid notification noise
+    try {
+        await removeTaskFollowers(taskGid, ['me'], asanaToken);
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.warning(`Failed to remove integration user as follower from task ${taskGid}: ${errorMessage}`);
+        // Not a critical failure
     }
     // Always attach PR via integration if secret is provided
     if (integrationSecret) {
@@ -44308,17 +44308,24 @@ function readRulesConfig() {
     const asanaToken = core.getInput('asana_token', { required: true });
     const githubToken = core.getInput('github_token', { required: true });
     const rulesYaml = core.getInput('rules', { required: true });
-    // Parse optional user mappings (JSON string)
+    // Parse optional user mappings (YAML or JSON string)
     const userMappingsInput = core.getInput('user_mappings');
     let userMappings = {};
     if (userMappingsInput) {
         try {
-            userMappings = JSON.parse(userMappingsInput);
-            core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
+            // Try YAML first (supports both YAML and JSON since JSON is valid YAML)
+            const parsed = yaml.load(userMappingsInput);
+            if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                userMappings = parsed;
+                core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
+            }
+            else {
+                throw new Error('user_mappings must be an object/map');
+            }
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new Error(`Invalid user_mappings JSON: ${errorMessage}`);
+            throw new Error(`Invalid user_mappings YAML: ${errorMessage}`);
         }
     }
     // Get optional integration secret

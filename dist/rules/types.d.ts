@@ -26,7 +26,6 @@ export interface CreateTaskAction {
     html_notes?: string;
     assignee?: string;
     initial_fields?: Record<string, string>;
-    remove_followers?: string[];
 }
 /**
  * Action block - defines what to do when a rule matches

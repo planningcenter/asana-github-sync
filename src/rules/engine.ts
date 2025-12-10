@@ -21,6 +21,7 @@ export interface RuleContext {
     merged: boolean;
     draft: boolean;
     author: string;
+    assignee?: string; // Optional: PR assignee username (may be undefined if not assigned)
     base_ref: string;
     head_ref: string;
     url: string;
@@ -65,6 +66,7 @@ export function buildRuleContext(
       merged: pr.merged || false,
       draft: pr.draft || false,
       author: pr.user.login,
+      assignee: pr.assignee?.login, // Optional: may be undefined
       base_ref: pr.base.ref,
       head_ref: pr.head.ref,
       url: pr.html_url || '',

@@ -16,6 +16,7 @@ export interface RuleContext {
         merged: boolean;
         draft: boolean;
         author: string;
+        assignee?: string;
         base_ref: string;
         head_ref: string;
         url: string;
@@ -93,6 +94,7 @@ export declare function buildCommentContext(ruleContext: RuleContext, taskResult
         merged: boolean;
         draft: boolean;
         author: string;
+        assignee?: string;
         base_ref: string;
         head_ref: string;
         url: string;
