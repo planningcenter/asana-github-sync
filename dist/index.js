@@ -42758,7 +42758,45 @@ function registerHelpers() {
         const comments = this.comments || '';
         return extractFromText(pattern, comments);
     });
-    core.debug('Handlebars extraction helpers registered');
+    // Helper: Clean conventional commit prefixes from title
+    handlebars_1.default.registerHelper('clean_title', function (title) {
+        if (!title)
+            return '';
+        // Remove conventional commit prefixes:
+        // feat: fix: chore: docs: style: refactor: perf: test:
+        // feat(scope): chore(api): etc.
+        return title.replace(/^(feat|fix|chore|docs|style|refactor|perf|test)(\([^)]+\))?:\s*/, '');
+    });
+    // Helper: Sanitize markdown for Asana notes (comprehensive version)
+    handlebars_1.default.registerHelper('sanitize_markdown', function (text) {
+        if (!text)
+            return '';
+        return (text
+            // Remove markdown images - both linked and standalone
+            .replace(/\[!\[([^\]]*)\]\([^)]+(?:\s+"[^"]*")?\)\]\(([^)]+)\)/g, '') // Linked images
+            .replace(/!\[[^\]]*\]\([^)]+(?:\s+"[^"]*")?\)/g, '') // Standalone images
+            // Remove HTML-style markdown comments
+            .replace(/\[\/\/\]: # \([^)]*\)/g, '')
+            // Remove <details> tags and content
+            .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
+            // Convert <br> to newlines
+            .replace(/<br\s*\/?>/gi, '\n')
+            // Normalize line endings
+            .replace(/\r\n/g, '\n') // Windows to Unix
+            .replace(/\r/g, '\n') // Mac to Unix
+            // Collapse whitespace
+            .replace(/[ \t]+/g, ' ') // Multiple spaces/tabs to single space
+            .replace(/\n[ \t]*/g, '\n') // Remove spaces after newlines
+            .replace(/[ \t]*\n/g, '\n') // Remove spaces before newlines
+            .replace(/\n{3,}/g, '\n\n') // Collapse 3+ newlines to 2
+            .trim());
+    });
+    // Helper: Map GitHub username to Asana user GID
+    handlebars_1.default.registerHelper('map_github_to_asana', function (githubUsername) {
+        const mappings = this.userMappings || {};
+        return mappings[githubUsername] || ''; // Empty string if not found
+    });
+    core.debug('Handlebars helpers registered');
 }
 
 
@@ -42813,10 +42851,11 @@ const config_1 = __nccwpck_require__(2176);
 const validator_1 = __nccwpck_require__(1685);
 const engine_1 = __nccwpck_require__(9693);
 const parser_1 = __nccwpck_require__(4325);
-const asana_1 = __nccwpck_require__(4038);
+const asana_1 = __nccwpck_require__(7757);
+const github_1 = __nccwpck_require__(3585);
 const helpers_1 = __nccwpck_require__(3915);
 const template_analysis_1 = __nccwpck_require__(5127);
-const github_1 = __nccwpck_require__(3585);
+const github_2 = __nccwpck_require__(3585);
 const evaluator_1 = __nccwpck_require__(5851);
 async function run() {
     try {
@@ -42824,12 +42863,18 @@ async function run() {
         (0, helpers_1.registerHelpers)();
         // Read and validate rules configuration
         core.info('Reading rules configuration...');
-        const { asanaToken, githubToken, rules } = (0, config_1.readRulesConfig)();
+        const { asanaToken, githubToken, rules, userMappings, integrationSecret } = (0, config_1.readRulesConfig)();
         (0, validator_1.validateRulesConfig)(rules);
         core.info(`✓ Rules configuration loaded`);
         core.info(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
         core.info(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
         core.info(`  - Rules: ${rules.rules.length} rule(s) configured`);
+        if (Object.keys(userMappings).length > 0) {
+            core.info(`  - User mappings: ${Object.keys(userMappings).length} mapping(s)`);
+        }
+        if (integrationSecret) {
+            core.info(`  - Integration secret: configured`);
+        }
         // Check if any rule uses extract_from_comments helper
         const needsComments = (0, template_analysis_1.rulesUseHelper)(rules.rules, 'extract_from_comments');
         let comments;
@@ -42837,74 +42882,117 @@ async function run() {
             core.info('Rules use extract_from_comments, fetching PR comments...');
             const prNumber = github.context.payload.pull_request?.number;
             if (prNumber) {
-                comments = await (0, github_1.fetchPRComments)(githubToken, prNumber);
+                comments = await (0, github_2.fetchPRComments)(githubToken, prNumber);
             }
             else {
                 core.warning('No PR number found in payload, cannot fetch comments');
                 comments = '';
             }
         }
+        // Extract Asana task IDs from PR body to determine hasAsanaTasks
+        const prBody = github.context.payload.pull_request?.body || '';
+        const { taskIds } = (0, parser_1.extractAsanaTaskIds)(prBody);
+        const hasAsanaTasks = taskIds.length > 0;
         // Build rule context from GitHub event
-        const context = (0, engine_1.buildRuleContext)(github.context, comments);
+        const context = (0, engine_1.buildRuleContext)(github.context, comments, hasAsanaTasks, userMappings);
         core.info(`Event: ${context.eventName}, Action: ${context.action}`);
         core.info(`PR #${context.pr.number}: ${context.pr.title}`);
-        // Extract Asana task IDs from PR body
-        const { taskIds } = (0, parser_1.extractAsanaTaskIds)(context.pr.body);
-        if (taskIds.length === 0) {
+        core.info(`has_asana_tasks: ${hasAsanaTasks}`);
+        // Execute rules to get field updates, comment templates, and task creation specs
+        const { fieldUpdates, commentTemplates, taskCreationSpecs } = (0, engine_1.executeRules)(rules.rules, context);
+        // SPLIT EXECUTION PATH: Task creation vs. updates
+        if (taskCreationSpecs.length > 0) {
+            // PATH A: Task Creation Mode
+            core.info(`Creating ${taskCreationSpecs.length} task(s)...`);
+            const prNumber = github.context.payload.pull_request?.number;
+            if (!prNumber) {
+                core.error('No PR number found in payload, cannot create tasks');
+                return;
+            }
+            const createdTasks = await (0, asana_1.createAllTasks)(taskCreationSpecs, asanaToken, integrationSecret, context.pr.url);
+            const successCount = createdTasks.filter((t) => t.success).length;
+            const failedCount = createdTasks.filter((t) => !t.success).length;
+            // Update PR body with task links
+            for (const task of createdTasks) {
+                if (task.success) {
+                    await (0, github_1.appendAsanaLinkToPR)(githubToken, prNumber, task.name, task.url);
+                }
+            }
+            // Post PR comments if configured
+            if (commentTemplates.length > 0) {
+                const commentContext = (0, engine_1.buildCommentContext)(context, createdTasks, fieldUpdates);
+                await (0, github_2.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
+            }
+            // Log summary
+            core.info('');
+            core.info(`=== Creation Summary ===`);
+            core.info(`Total tasks created: ${successCount} of ${taskCreationSpecs.length}`);
+            if (failedCount > 0) {
+                const failedTaskNames = createdTasks.filter((t) => !t.success).map((t) => t.name);
+                core.info(`✗ Failed: ${failedCount} (${failedTaskNames.join(', ')})`);
+            }
+            core.info('');
+            // Set outputs
+            const createdTaskIds = createdTasks.filter((t) => t.success).map((t) => t.gid).join(',');
+            core.setOutput('task_ids', createdTaskIds);
+            core.setOutput('tasks_created', successCount.toString());
+        }
+        else if (taskIds.length > 0) {
+            // PATH B: Update Existing Tasks (existing logic)
+            core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
+            if (fieldUpdates.size === 0 && commentTemplates.length === 0) {
+                core.info('No rules matched, skipping');
+                return;
+            }
+            core.info(`${fieldUpdates.size} field update(s) to apply`);
+            if (commentTemplates.length > 0) {
+                core.info(`${commentTemplates.length} PR comment(s) configured`);
+            }
+            // Fetch task details if comment templates exist
+            let taskDetails = [];
+            if (commentTemplates.length > 0) {
+                taskDetails = await (0, asana_1.fetchAllTaskDetails)(taskIds, asanaToken);
+            }
+            // Update all Asana tasks and collect results
+            const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken);
+            const successCount = taskResults.filter((t) => t.success).length;
+            const failedCount = taskResults.filter((t) => !t.success).length;
+            // Post PR comments if configured
+            if (commentTemplates.length > 0) {
+                const prNumber = github.context.payload.pull_request?.number;
+                if (prNumber) {
+                    const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
+                    await (0, github_2.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
+                }
+                else {
+                    core.warning('No PR number found in payload, cannot post comments');
+                }
+            }
+            // Log summary
+            core.info('');
+            core.info(`=== Update Summary ===`);
+            core.info(`Total tasks: ${taskResults.length}`);
+            core.info(`✓ Successful: ${successCount}`);
+            if (failedCount > 0) {
+                const failedTaskIds = taskResults.filter((t) => !t.success).map((t) => t.gid);
+                core.info(`✗ Failed: ${failedCount} (${failedTaskIds.join(', ')})`);
+            }
+            core.info('');
+            // Set outputs
+            core.setOutput('task_ids', taskIds.join(','));
+            core.setOutput('tasks_updated', successCount.toString());
+        }
+        else {
+            // No tasks found and no task creation rules matched
             core.info('No Asana task links found in PR body');
             // Post comment asking for Asana URL if configured
             if (rules.comment_on_pr_when_asana_url_missing) {
                 const prNumber = github.context.payload.pull_request?.number;
                 if (prNumber) {
-                    await (0, github_1.postMissingAsanaUrlPrompt)(githubToken, prNumber);
+                    await (0, github_2.postMissingAsanaUrlPrompt)(githubToken, prNumber);
                 }
             }
-            return;
         }
-        core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
-        // Execute rules to get field updates and comment templates
-        const { fieldUpdates, commentTemplates } = (0, engine_1.executeRules)(rules.rules, context);
-        if (fieldUpdates.size === 0 && commentTemplates.length === 0) {
-            core.info('No rules matched, skipping');
-            return;
-        }
-        core.info(`${fieldUpdates.size} field update(s) to apply`);
-        if (commentTemplates.length > 0) {
-            core.info(`${commentTemplates.length} PR comment(s) configured`);
-        }
-        // Fetch task details if comment templates exist
-        let taskDetails = [];
-        if (commentTemplates.length > 0) {
-            taskDetails = await (0, asana_1.fetchAllTaskDetails)(taskIds, asanaToken);
-        }
-        // Update all Asana tasks and collect results
-        const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken);
-        const successCount = taskResults.filter((t) => t.success).length;
-        const failedCount = taskResults.filter((t) => !t.success).length;
-        // Post PR comments if configured
-        if (commentTemplates.length > 0) {
-            const prNumber = github.context.payload.pull_request?.number;
-            if (prNumber) {
-                const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
-                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
-            }
-            else {
-                core.warning('No PR number found in payload, cannot post comments');
-            }
-        }
-        // Log summary
-        core.info('');
-        core.info(`=== Update Summary ===`);
-        core.info(`Total tasks: ${taskResults.length}`);
-        core.info(`✓ Successful: ${successCount}`);
-        if (failedCount > 0) {
-            const failedTaskIds = taskResults.filter((t) => !t.success).map((t) => t.gid);
-            core.info(`✗ Failed: ${failedCount} (${failedTaskIds.join(', ')})`);
-        }
-        core.info('');
-        // Set outputs
-        core.setOutput('task_ids', taskIds.join(','));
-        core.setOutput('tasks_updated', successCount.toString());
     }
     catch (error) {
         // NEVER fail the workflow - just log the error
@@ -42975,9 +43063,11 @@ const evaluator_1 = __nccwpck_require__(5851);
  *
  * @param githubContext - GitHub Actions context
  * @param comments - Optional PR comments (pre-fetched if needed by caller)
+ * @param hasAsanaTasks - Whether PR body contains Asana task links
+ * @param userMappings - Optional GitHub username → Asana user GID mapping
  * @returns Strongly-typed context for rules engine
  */
-function buildRuleContext(githubContext, comments) {
+function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) {
     const { eventName, payload } = githubContext;
     const pr = payload.pull_request;
     if (!pr) {
@@ -42997,6 +43087,7 @@ function buildRuleContext(githubContext, comments) {
             head_ref: pr.head.ref,
             url: pr.html_url || '',
         },
+        hasAsanaTasks,
     };
     if (payload.label) {
         context.label = {
@@ -43005,6 +43096,9 @@ function buildRuleContext(githubContext, comments) {
     }
     if (comments !== undefined) {
         context.comments = comments;
+    }
+    if (userMappings !== undefined) {
+        context.userMappings = userMappings;
     }
     return context;
 }
@@ -43041,6 +43135,19 @@ function matchesCondition(condition, context) {
             return false;
         }
     }
+    // has_asana_tasks (if specified) must match
+    if (condition.has_asana_tasks !== undefined) {
+        if (condition.has_asana_tasks !== context.hasAsanaTasks) {
+            return false;
+        }
+    }
+    // Author (if specified) must match
+    if (condition.author !== undefined) {
+        const authors = Array.isArray(condition.author) ? condition.author : [condition.author];
+        if (!authors.includes(context.pr.author)) {
+            return false;
+        }
+    }
     return true;
 }
 /**
@@ -43053,6 +43160,7 @@ function matchesCondition(condition, context) {
 function executeRules(rules, context) {
     const fieldUpdates = new Map();
     const commentTemplates = [];
+    const taskCreationSpecs = [];
     let shouldMarkComplete = false;
     for (const [index, rule] of rules.entries()) {
         if (!matchesCondition(rule.when, context)) {
@@ -43069,26 +43177,42 @@ function executeRules(rules, context) {
             },
             label: context.label,
             comments: context.comments,
+            userMappings: context.userMappings,
         };
-        // Evaluate each field template with Handlebars
-        for (const [fieldGid, template] of Object.entries(rule.then.update_fields)) {
+        // Handle task creation if present
+        if (rule.then.create_task) {
             try {
-                const value = (0, evaluator_1.evaluateTemplate)(template, handlebarsContext);
-                // Skip empty values - usually means extraction found nothing
-                // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
-                // TODO(docs): Document this behavior - fields with empty template results are skipped
-                if (value === '') {
-                    core.info(`  Field ${fieldGid} skipped (empty value)`);
-                    continue;
-                }
-                // Last rule wins for conflicting fields
-                fieldUpdates.set(fieldGid, value);
-                core.info(`  Field ${fieldGid} = "${value}"`);
+                const spec = evaluateCreateTaskSpec(rule.then.create_task, handlebarsContext, index);
+                taskCreationSpecs.push(spec);
+                core.info(`  Will create task: "${spec.evaluatedTitle}"`);
             }
             catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                core.error(`Failed to evaluate field ${fieldGid}: ${errorMessage}`);
-                // Continue with other fields
+                core.error(`Failed to evaluate create_task for rule ${index}: ${errorMessage}`);
+                // Continue with other rules
+            }
+        }
+        // Evaluate each field template with Handlebars
+        if (rule.then.update_fields) {
+            for (const [fieldGid, template] of Object.entries(rule.then.update_fields)) {
+                try {
+                    const value = (0, evaluator_1.evaluateTemplate)(template, handlebarsContext);
+                    // Skip empty values - usually means extraction found nothing
+                    // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
+                    // TODO(docs): Document this behavior - fields with empty template results are skipped
+                    if (value === '') {
+                        core.info(`  Field ${fieldGid} skipped (empty value)`);
+                        continue;
+                    }
+                    // Last rule wins for conflicting fields
+                    fieldUpdates.set(fieldGid, value);
+                    core.info(`  Field ${fieldGid} = "${value}"`);
+                }
+                catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    core.error(`Failed to evaluate field ${fieldGid}: ${errorMessage}`);
+                    // Continue with other fields
+                }
             }
         }
         // Aggregate mark_complete flag (any rule can set it)
@@ -43105,7 +43229,67 @@ function executeRules(rules, context) {
     if (shouldMarkComplete) {
         fieldUpdates.set('__mark_complete', 'true');
     }
-    return { fieldUpdates, commentTemplates };
+    return { fieldUpdates, commentTemplates, taskCreationSpecs };
+}
+/**
+ * Evaluate create_task action and build task creation specification
+ *
+ * @param action - CreateTaskAction to evaluate
+ * @param handlebarsContext - Context for template evaluation
+ * @param ruleIndex - Rule index for error messages
+ * @returns Evaluated task creation specification
+ */
+function evaluateCreateTaskSpec(action, handlebarsContext, ruleIndex) {
+    // Evaluate title (required)
+    const evaluatedTitle = (0, evaluator_1.evaluateTemplate)(action.title, handlebarsContext);
+    if (!evaluatedTitle) {
+        throw new Error(`Rule ${ruleIndex}: create_task.title evaluated to empty string`);
+    }
+    // Evaluate optional notes
+    let evaluatedNotes;
+    if (action.notes) {
+        evaluatedNotes = (0, evaluator_1.evaluateTemplate)(action.notes, handlebarsContext);
+    }
+    // Evaluate optional html_notes
+    let evaluatedHtmlNotes;
+    if (action.html_notes) {
+        evaluatedHtmlNotes = (0, evaluator_1.evaluateTemplate)(action.html_notes, handlebarsContext);
+    }
+    // Evaluate optional assignee
+    let evaluatedAssignee;
+    if (action.assignee) {
+        evaluatedAssignee = (0, evaluator_1.evaluateTemplate)(action.assignee, handlebarsContext);
+        // Empty string means no assignee (mapping not found)
+        if (evaluatedAssignee === '') {
+            evaluatedAssignee = undefined;
+        }
+    }
+    // Evaluate initial fields
+    const evaluatedInitialFields = new Map();
+    if (action.initial_fields) {
+        for (const [fieldGid, template] of Object.entries(action.initial_fields)) {
+            try {
+                const value = (0, evaluator_1.evaluateTemplate)(template, handlebarsContext);
+                // Skip empty values (similar to update_fields behavior)
+                if (value !== '') {
+                    evaluatedInitialFields.set(fieldGid, value);
+                }
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                core.warning(`Rule ${ruleIndex}: Failed to evaluate initial field ${fieldGid}: ${errorMessage}`);
+                // Continue with other fields
+            }
+        }
+    }
+    return {
+        action,
+        evaluatedTitle,
+        evaluatedNotes,
+        evaluatedHtmlNotes,
+        evaluatedAssignee,
+        evaluatedInitialFields,
+    };
 }
 /**
  * Build Handlebars context for comment template evaluation
@@ -43205,20 +43389,63 @@ function validateRule(rule, index) {
     if (rule.when.label !== undefined && typeof rule.when.label !== 'string') {
         throw new Error(`${prefix} 'label' must be a string`);
     }
+    if (rule.when.has_asana_tasks !== undefined && typeof rule.when.has_asana_tasks !== 'boolean') {
+        throw new Error(`${prefix} 'has_asana_tasks' must be a boolean`);
+    }
+    // Validate author field
+    if (rule.when.author !== undefined) {
+        if (typeof rule.when.author !== 'string' && !Array.isArray(rule.when.author)) {
+            throw new Error(`${prefix} 'author' must be a string or array`);
+        }
+        if (Array.isArray(rule.when.author) && rule.when.author.length === 0) {
+            throw new Error(`${prefix} 'author' array cannot be empty`);
+        }
+    }
     // Validate 'then' block
     if (!rule.then) {
         throw new Error(`${prefix} Missing 'then' block`);
     }
-    if (!rule.then.update_fields || typeof rule.then.update_fields !== 'object') {
-        throw new Error(`${prefix} 'update_fields' must be an object`);
+    // Check mutual exclusivity based on has_asana_tasks
+    const hasAsanaTasks = rule.when.has_asana_tasks ?? true; // defaults to true
+    const hasCreateTask = !!rule.then.create_task;
+    const hasUpdateFields = rule.then.update_fields && Object.keys(rule.then.update_fields).length > 0;
+    const hasMarkComplete = !!rule.then.mark_complete;
+    const hasPostComment = !!rule.then.post_pr_comment;
+    // Validate mutual exclusivity rules
+    if (hasAsanaTasks === false) {
+        // When has_asana_tasks: false - MUST create task, CANNOT update
+        if (!hasCreateTask) {
+            throw new Error(`${prefix} has_asana_tasks: false requires create_task action`);
+        }
+        if (hasUpdateFields) {
+            throw new Error(`${prefix} has_asana_tasks: false cannot have update_fields`);
+        }
+        if (hasMarkComplete) {
+            throw new Error(`${prefix} has_asana_tasks: false cannot have mark_complete`);
+        }
+        // post_pr_comment is ALLOWED
+        // Validate create_task structure
+        validateCreateTaskAction(rule.then.create_task, index);
     }
-    if (Object.keys(rule.then.update_fields).length === 0) {
-        throw new Error(`${prefix} 'update_fields' cannot be empty`);
+    else {
+        // When has_asana_tasks: true (or omitted) - CANNOT create, CAN update
+        if (hasCreateTask) {
+            throw new Error(`${prefix} create_task requires has_asana_tasks: false`);
+        }
+        if (!hasUpdateFields && !hasMarkComplete && !hasPostComment) {
+            throw new Error(`${prefix} must have at least one action (update_fields, mark_complete, or post_pr_comment)`);
+        }
     }
-    // Validate field GIDs are numeric strings
-    for (const gid of Object.keys(rule.then.update_fields)) {
-        if (!/^\d+$/.test(gid)) {
-            throw new Error(`${prefix} Invalid field GID '${gid}' (must be numeric)`);
+    // Validate update_fields if present
+    if (rule.then.update_fields) {
+        if (typeof rule.then.update_fields !== 'object') {
+            throw new Error(`${prefix} 'update_fields' must be an object`);
+        }
+        // Validate field GIDs are numeric strings
+        for (const gid of Object.keys(rule.then.update_fields)) {
+            if (!/^\d+$/.test(gid)) {
+                throw new Error(`${prefix} Invalid field GID '${gid}' (must be numeric)`);
+            }
         }
     }
     if (rule.then.mark_complete !== undefined && typeof rule.then.mark_complete !== 'boolean') {
@@ -43233,17 +43460,363 @@ function validateRule(rule, index) {
         }
     }
 }
+/**
+ * Validate create_task action structure
+ *
+ * @param action - CreateTaskAction to validate
+ * @param ruleIndex - Rule index (for error messages)
+ * @throws Error if validation fails
+ */
+function validateCreateTaskAction(action, ruleIndex) {
+    const prefix = `Rule ${ruleIndex}: create_task`;
+    // Validate required fields
+    if (!action.project || typeof action.project !== 'string') {
+        throw new Error(`${prefix}.project is required and must be a string`);
+    }
+    if (!/^\d+$/.test(action.project)) {
+        throw new Error(`${prefix}.project must be a numeric GID`);
+    }
+    if (!action.workspace || typeof action.workspace !== 'string') {
+        throw new Error(`${prefix}.workspace is required and must be a string`);
+    }
+    if (!/^\d+$/.test(action.workspace)) {
+        throw new Error(`${prefix}.workspace must be a numeric GID`);
+    }
+    if (!action.title || typeof action.title !== 'string') {
+        throw new Error(`${prefix}.title is required and must be a non-empty string`);
+    }
+    // Validate optional section
+    if (action.section !== undefined) {
+        if (typeof action.section !== 'string') {
+            throw new Error(`${prefix}.section must be a string`);
+        }
+        if (!/^\d+$/.test(action.section)) {
+            throw new Error(`${prefix}.section must be a numeric GID`);
+        }
+    }
+    // Validate notes/html_notes mutual exclusivity
+    if (action.notes && action.html_notes) {
+        throw new Error(`${prefix} cannot have both notes and html_notes`);
+    }
+    if (action.notes !== undefined && typeof action.notes !== 'string') {
+        throw new Error(`${prefix}.notes must be a string`);
+    }
+    if (action.html_notes !== undefined && typeof action.html_notes !== 'string') {
+        throw new Error(`${prefix}.html_notes must be a string`);
+    }
+    // Validate assignee
+    if (action.assignee !== undefined && typeof action.assignee !== 'string') {
+        throw new Error(`${prefix}.assignee must be a string`);
+    }
+    // Validate initial_fields
+    if (action.initial_fields !== undefined) {
+        if (typeof action.initial_fields !== 'object') {
+            throw new Error(`${prefix}.initial_fields must be an object`);
+        }
+        for (const fieldGid of Object.keys(action.initial_fields)) {
+            if (!/^\d+$/.test(fieldGid)) {
+                throw new Error(`${prefix}.initial_fields has invalid GID '${fieldGid}' (must be numeric)`);
+            }
+        }
+    }
+    // Validate remove_followers
+    if (action.remove_followers !== undefined) {
+        if (!Array.isArray(action.remove_followers)) {
+            throw new Error(`${prefix}.remove_followers must be an array`);
+        }
+        if (action.remove_followers.length === 0) {
+            throw new Error(`${prefix}.remove_followers cannot be empty`);
+        }
+    }
+}
 
 
 /***/ }),
 
-/***/ 4038:
+/***/ 1382:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/**
+ * Base Asana API client
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ASANA_API_BASE = void 0;
+exports.asanaRequest = asanaRequest;
+const errors_1 = __nccwpck_require__(17);
+exports.ASANA_API_BASE = 'https://app.asana.com/api/1.0';
+/**
+ * Make an authenticated request to the Asana API
+ *
+ * @param token - Asana Personal Access Token
+ * @param endpoint - API endpoint path (e.g., '/custom_fields/123')
+ * @param options - Fetch options (method, body, etc.)
+ * @returns Parsed JSON response
+ */
+async function asanaRequest(token, endpoint, options = {}) {
+    const response = await fetch(`${exports.ASANA_API_BASE}${endpoint}`, {
+        ...options,
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...options.headers,
+        },
+    });
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new errors_1.ApiError(`Asana API error: ${response.status} ${response.statusText}`, response.status, errorBody);
+    }
+    const json = (await response.json());
+    return json.data;
+}
+
+
+/***/ }),
+
+/***/ 293:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
 /**
- * Asana API integration using direct HTTP requests
+ * Task creation operations
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createTask = createTask;
+exports.createAllTasks = createAllTasks;
+const core = __importStar(__nccwpck_require__(7484));
+const retry_1 = __nccwpck_require__(4266);
+const client_1 = __nccwpck_require__(1382);
+const fields_1 = __nccwpck_require__(836);
+/**
+ * Create a new Asana task from evaluated specification
+ *
+ * @param spec - Task creation specification from rules engine
+ * @param asanaToken - Asana API token
+ * @param integrationSecret - Optional integration secret for rich PR attachment
+ * @param prUrl - PR URL for integration attachment
+ * @returns Created task result
+ */
+async function createTask(spec, asanaToken, integrationSecret, prUrl) {
+    const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } = spec;
+    core.info(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
+    // Build task data
+    const taskData = {
+        name: evaluatedTitle,
+        projects: [action.project],
+        workspace: action.workspace,
+    };
+    // Add section membership if specified
+    if (action.section) {
+        taskData.memberships = [{ project: action.project, section: action.section }];
+    }
+    // Add notes or html_notes
+    if (evaluatedNotes) {
+        taskData.notes = evaluatedNotes;
+    }
+    if (evaluatedHtmlNotes) {
+        taskData.html_notes = evaluatedHtmlNotes;
+    }
+    // Add assignee
+    if (evaluatedAssignee) {
+        taskData.assignee = evaluatedAssignee;
+    }
+    // Add initial custom field values
+    if (evaluatedInitialFields.size > 0) {
+        const customFields = {};
+        for (const [fieldGid, rawValue] of evaluatedInitialFields.entries()) {
+            try {
+                // Fetch field schema (with caching)
+                const schema = await (0, fields_1.getFieldSchema)(asanaToken, fieldGid);
+                // Coerce the value to the appropriate type
+                const coercedValue = (0, fields_1.coerceFieldValue)(schema, rawValue, fieldGid);
+                if (coercedValue !== null) {
+                    customFields[fieldGid] = coercedValue;
+                }
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                core.warning(`Failed to set initial field ${fieldGid}: ${errorMessage}`);
+                // Continue with other fields
+            }
+        }
+        if (Object.keys(customFields).length > 0) {
+            taskData.custom_fields = customFields;
+        }
+    }
+    // Create task
+    const task = await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, '/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ data: taskData }),
+    }), 'create task');
+    const taskGid = task.gid;
+    const taskUrl = task.permalink_url || `https://app.asana.com/0/${action.project}/${taskGid}`;
+    core.info(`✓ Task created: ${taskGid}`);
+    // Remove followers if specified
+    if (action.remove_followers && action.remove_followers.length > 0) {
+        try {
+            await removeTaskFollowers(taskGid, action.remove_followers, asanaToken);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to remove followers from task ${taskGid}: ${errorMessage}`);
+            // Not a critical failure
+        }
+    }
+    // Always attach PR via integration if secret is provided
+    if (integrationSecret) {
+        try {
+            await attachPRViaIntegration(taskGid, prUrl, integrationSecret, asanaToken);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to attach PR via integration: ${errorMessage}`);
+            // Not a critical failure
+        }
+    }
+    return {
+        gid: taskGid,
+        name: evaluatedTitle,
+        url: taskUrl,
+        success: true,
+    };
+}
+/**
+ * Remove followers from a task
+ *
+ * @param taskGid - Task GID
+ * @param followers - Array of follower identifiers (e.g., ["me"])
+ * @param asanaToken - Asana API token
+ */
+async function removeTaskFollowers(taskGid, followers, asanaToken) {
+    for (const follower of followers) {
+        core.debug(`Removing follower ${follower} from task ${taskGid}...`);
+        await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}/removeFollowers`, {
+            method: 'POST',
+            body: JSON.stringify({ data: { followers: [follower] } }),
+        }), `remove follower ${follower}`);
+    }
+    core.info(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
+}
+/**
+ * Attach PR via Asana-GitHub integration for rich formatting
+ *
+ * @param taskGid - Task GID to attach PR to
+ * @param prUrl - GitHub PR URL
+ * @param integrationSecret - Integration secret
+ * @param asanaToken - Asana API token
+ */
+async function attachPRViaIntegration(taskGid, prUrl, integrationSecret, asanaToken) {
+    core.info(`Attaching PR ${prUrl} to task ${taskGid} via integration...`);
+    // Extract domain from PR URL
+    const domain = new URL(prUrl).hostname; // e.g., "github.com"
+    const attachmentData = {
+        resource_url: prUrl,
+        secret: integrationSecret,
+    };
+    // Use AbortController for 30s timeout (matches script 2 behavior)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+        const response = await fetch(`https://app.asana.com/api/1.0/external/${domain}/attachments`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${asanaToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                data: {
+                    resource: taskGid,
+                    ...attachmentData,
+                },
+            }),
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`Integration API error: ${response.status} ${response.statusText}: ${errorBody}`);
+        }
+        core.info(`✓ PR attached via integration`);
+    }
+    finally {
+        clearTimeout(timeout);
+    }
+}
+/**
+ * Create all tasks from specs
+ * Handles failures gracefully per-task
+ *
+ * @param specs - Array of task creation specifications
+ * @param asanaToken - Asana API token
+ * @param integrationSecret - Optional integration secret
+ * @param prUrl - PR URL for integration attachment
+ * @returns Array of creation results with success status
+ */
+async function createAllTasks(specs, asanaToken, integrationSecret, prUrl) {
+    const results = [];
+    for (const spec of specs) {
+        try {
+            const result = await createTask(spec, asanaToken, integrationSecret, prUrl);
+            results.push(result);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.error(`Failed to create task "${spec.evaluatedTitle}": ${errorMessage}`);
+            results.push({
+                gid: '',
+                name: spec.evaluatedTitle,
+                url: '',
+                success: false,
+            });
+        }
+    }
+    return results;
+}
+
+
+/***/ }),
+
+/***/ 836:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Custom field operations - schema fetching, caching, and value coercion
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -43280,14 +43853,12 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.clearFieldSchemaCache = clearFieldSchemaCache;
-exports.fetchTaskDetails = fetchTaskDetails;
-exports.fetchAllTaskDetails = fetchAllTaskDetails;
-exports.updateAllTasks = updateAllTasks;
-exports.updateTaskFields = updateTaskFields;
+exports.fetchCustomField = fetchCustomField;
+exports.getFieldSchema = getFieldSchema;
+exports.coerceFieldValue = coerceFieldValue;
 const core = __importStar(__nccwpck_require__(7484));
 const retry_1 = __nccwpck_require__(4266);
-const errors_1 = __nccwpck_require__(17);
-const ASANA_API_BASE = 'https://app.asana.com/api/1.0';
+const client_1 = __nccwpck_require__(1382);
 /**
  * Module-level cache for custom field schemas
  * Persists for the lifetime of the action run to avoid redundant API calls
@@ -43301,30 +43872,6 @@ function clearFieldSchemaCache() {
     fieldSchemaCache.clear();
 }
 /**
- * Make an authenticated request to the Asana API
- *
- * @param token - Asana Personal Access Token
- * @param endpoint - API endpoint path (e.g., '/custom_fields/123')
- * @param options - Fetch options (method, body, etc.)
- * @returns Parsed JSON response
- */
-async function asanaRequest(token, endpoint, options = {}) {
-    const response = await fetch(`${ASANA_API_BASE}${endpoint}`, {
-        ...options,
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            ...options.headers,
-        },
-    });
-    if (!response.ok) {
-        const errorBody = await response.text();
-        throw new errors_1.ApiError(`Asana API error: ${response.status} ${response.statusText}`, response.status, errorBody);
-    }
-    const json = (await response.json());
-    return json.data;
-}
-/**
  * Fetch custom field definition from Asana
  *
  * @param token - Asana Personal Access Token
@@ -43333,88 +43880,22 @@ async function asanaRequest(token, endpoint, options = {}) {
  */
 async function fetchCustomField(token, customFieldGid) {
     core.info(`Fetching custom field ${customFieldGid}...`);
-    return await (0, retry_1.withRetry)(() => asanaRequest(token, `/custom_fields/${customFieldGid}`), `fetch custom field ${customFieldGid}`);
+    return await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(token, `/custom_fields/${customFieldGid}`), `fetch custom field ${customFieldGid}`);
 }
 /**
- * Fetch task details (name and URL)
+ * Get custom field schema from cache or fetch if not cached
  *
- * @param taskGid - Task GID to fetch
- * @param asanaToken - Asana API token
- * @returns Task details with gid, name, and url
+ * @param token - Asana Personal Access Token
+ * @param fieldGid - Custom field GID
+ * @returns Custom field schema
  */
-async function fetchTaskDetails(taskGid, asanaToken) {
-    core.debug(`Fetching details for task ${taskGid}...`);
-    const task = await (0, retry_1.withRetry)(() => asanaRequest(asanaToken, `/tasks/${taskGid}?opt_fields=gid,name,permalink_url`), `fetch task ${taskGid}`);
-    return {
-        gid: task.gid,
-        name: task.name,
-        // Fallback to constructed URL if permalink_url not available
-        url: task.permalink_url || `https://app.asana.com/0/0/${task.gid}/f`,
-    };
-}
-/**
- * Fetch details for multiple tasks
- * Handles failures gracefully by using placeholder details
- *
- * @param taskGids - Array of task GIDs to fetch
- * @param asanaToken - Asana API token
- * @returns Array of task details (with placeholders for failed fetches)
- */
-async function fetchAllTaskDetails(taskGids, asanaToken) {
-    core.info('Fetching task details...');
-    const results = [];
-    for (const taskGid of taskGids) {
-        try {
-            const details = await fetchTaskDetails(taskGid, asanaToken);
-            results.push(details);
-        }
-        catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            core.warning(`Failed to fetch details for task ${taskGid}: ${errorMessage}`);
-            // Add placeholder so we can still proceed
-            results.push({
-                gid: taskGid,
-                name: `Task ${taskGid}`,
-                url: `https://app.asana.com/0/0/${taskGid}/f`,
-            });
-        }
+async function getFieldSchema(token, fieldGid) {
+    let schema = fieldSchemaCache.get(fieldGid);
+    if (!schema) {
+        schema = await fetchCustomField(token, fieldGid);
+        fieldSchemaCache.set(fieldGid, schema);
     }
-    return results;
-}
-/**
- * Update multiple tasks with the same field updates
- * Handles failures gracefully and tracks success/failure per task
- *
- * @param taskIds - Array of task GIDs to update
- * @param taskDetails - Array of task details (parallel to taskIds)
- * @param fieldUpdates - Map of field updates to apply
- * @param asanaToken - Asana API token
- * @returns Array of task results with success status
- */
-async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
-    const results = [];
-    for (let i = 0; i < taskIds.length; i++) {
-        const taskId = taskIds[i];
-        const details = taskDetails[i] || {
-            gid: taskId,
-            name: `Task ${taskId}`,
-            url: `https://app.asana.com/0/0/${taskId}/f`,
-        };
-        try {
-            if (fieldUpdates.size > 0) {
-                await updateTaskFields(taskId, fieldUpdates, asanaToken);
-            }
-            results.push({ ...details, success: true });
-        }
-        catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            core.error(`Failed to update task ${taskId}: ${errorMessage}`);
-            // TODO(feature): Consider posting error details as PR comment for better visibility
-            // Similar to the reusable workflow pattern that posts Asana API errors to PR
-            results.push({ ...details, success: false });
-        }
-    }
-    return results;
+    return schema;
 }
 /**
  * Find enum option matching the target state name
@@ -43492,6 +43973,218 @@ function coerceFieldValue(schema, rawValue, fieldGid) {
             return null;
     }
 }
+
+
+/***/ }),
+
+/***/ 7757:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createAllTasks = exports.createTask = exports.updateTaskFields = exports.updateAllTasks = exports.fetchAllTaskDetails = exports.fetchTaskDetails = exports.coerceFieldValue = exports.getFieldSchema = exports.fetchCustomField = exports.clearFieldSchemaCache = exports.asanaRequest = exports.ASANA_API_BASE = void 0;
+var client_1 = __nccwpck_require__(1382);
+Object.defineProperty(exports, "ASANA_API_BASE", ({ enumerable: true, get: function () { return client_1.ASANA_API_BASE; } }));
+Object.defineProperty(exports, "asanaRequest", ({ enumerable: true, get: function () { return client_1.asanaRequest; } }));
+var fields_1 = __nccwpck_require__(836);
+Object.defineProperty(exports, "clearFieldSchemaCache", ({ enumerable: true, get: function () { return fields_1.clearFieldSchemaCache; } }));
+Object.defineProperty(exports, "fetchCustomField", ({ enumerable: true, get: function () { return fields_1.fetchCustomField; } }));
+Object.defineProperty(exports, "getFieldSchema", ({ enumerable: true, get: function () { return fields_1.getFieldSchema; } }));
+Object.defineProperty(exports, "coerceFieldValue", ({ enumerable: true, get: function () { return fields_1.coerceFieldValue; } }));
+var tasks_1 = __nccwpck_require__(5067);
+Object.defineProperty(exports, "fetchTaskDetails", ({ enumerable: true, get: function () { return tasks_1.fetchTaskDetails; } }));
+Object.defineProperty(exports, "fetchAllTaskDetails", ({ enumerable: true, get: function () { return tasks_1.fetchAllTaskDetails; } }));
+var update_1 = __nccwpck_require__(8520);
+Object.defineProperty(exports, "updateAllTasks", ({ enumerable: true, get: function () { return update_1.updateAllTasks; } }));
+Object.defineProperty(exports, "updateTaskFields", ({ enumerable: true, get: function () { return update_1.updateTaskFields; } }));
+var create_1 = __nccwpck_require__(293);
+Object.defineProperty(exports, "createTask", ({ enumerable: true, get: function () { return create_1.createTask; } }));
+Object.defineProperty(exports, "createAllTasks", ({ enumerable: true, get: function () { return create_1.createAllTasks; } }));
+
+
+/***/ }),
+
+/***/ 5067:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Task fetching operations
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fetchTaskDetails = fetchTaskDetails;
+exports.fetchAllTaskDetails = fetchAllTaskDetails;
+const core = __importStar(__nccwpck_require__(7484));
+const retry_1 = __nccwpck_require__(4266);
+const client_1 = __nccwpck_require__(1382);
+/**
+ * Fetch task details (name and URL)
+ *
+ * @param taskGid - Task GID to fetch
+ * @param asanaToken - Asana API token
+ * @returns Task details with gid, name, and url
+ */
+async function fetchTaskDetails(taskGid, asanaToken) {
+    core.debug(`Fetching details for task ${taskGid}...`);
+    const task = await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}?opt_fields=gid,name,permalink_url`), `fetch task ${taskGid}`);
+    return {
+        gid: task.gid,
+        name: task.name,
+        // Fallback to constructed URL if permalink_url not available
+        url: task.permalink_url || `https://app.asana.com/0/0/${task.gid}/f`,
+    };
+}
+/**
+ * Fetch details for multiple tasks
+ * Handles failures gracefully by using placeholder details
+ *
+ * @param taskGids - Array of task GIDs to fetch
+ * @param asanaToken - Asana API token
+ * @returns Array of task details (with placeholders for failed fetches)
+ */
+async function fetchAllTaskDetails(taskGids, asanaToken) {
+    core.info('Fetching task details...');
+    const results = [];
+    for (const taskGid of taskGids) {
+        try {
+            const details = await fetchTaskDetails(taskGid, asanaToken);
+            results.push(details);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to fetch details for task ${taskGid}: ${errorMessage}`);
+            // Add placeholder so we can still proceed
+            results.push({
+                gid: taskGid,
+                name: `Task ${taskGid}`,
+                url: `https://app.asana.com/0/0/${taskGid}/f`,
+            });
+        }
+    }
+    return results;
+}
+
+
+/***/ }),
+
+/***/ 8520:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Task update operations
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.updateAllTasks = updateAllTasks;
+exports.updateTaskFields = updateTaskFields;
+const core = __importStar(__nccwpck_require__(7484));
+const retry_1 = __nccwpck_require__(4266);
+const client_1 = __nccwpck_require__(1382);
+const fields_1 = __nccwpck_require__(836);
+/**
+ * Update multiple tasks with the same field updates
+ * Handles failures gracefully and tracks success/failure per task
+ *
+ * @param taskIds - Array of task GIDs to update
+ * @param taskDetails - Array of task details (parallel to taskIds)
+ * @param fieldUpdates - Map of field updates to apply
+ * @param asanaToken - Asana API token
+ * @returns Array of task results with success status
+ */
+async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
+    const results = [];
+    for (let i = 0; i < taskIds.length; i++) {
+        const taskId = taskIds[i];
+        const details = taskDetails[i] || {
+            gid: taskId,
+            name: `Task ${taskId}`,
+            url: `https://app.asana.com/0/0/${taskId}/f`,
+        };
+        try {
+            if (fieldUpdates.size > 0) {
+                await updateTaskFields(taskId, fieldUpdates, asanaToken);
+            }
+            results.push({ ...details, success: true });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+            // TODO(feature): Consider posting error details as PR comment for better visibility
+            // Similar to the reusable workflow pattern that posts Asana API errors to PR
+            results.push({ ...details, success: false });
+        }
+    }
+    return results;
+}
 /**
  * Update Asana task with field updates from rules engine (v2)
  *
@@ -43508,13 +44201,9 @@ async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
             continue;
         try {
             // Fetch field schema (with caching)
-            let schema = fieldSchemaCache.get(fieldGid);
-            if (!schema) {
-                schema = await fetchCustomField(asanaToken, fieldGid);
-                fieldSchemaCache.set(fieldGid, schema);
-            }
+            const schema = await (0, fields_1.getFieldSchema)(asanaToken, fieldGid);
             // Coerce the value to the appropriate type
-            const coercedValue = coerceFieldValue(schema, rawValue, fieldGid);
+            const coercedValue = (0, fields_1.coerceFieldValue)(schema, rawValue, fieldGid);
             if (coercedValue === null) {
                 continue; // Skip this field if validation failed
             }
@@ -43541,7 +44230,7 @@ async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
     }
     // Single PUT request
     core.info(`Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`);
-    await (0, retry_1.withRetry)(() => asanaRequest(asanaToken, `/tasks/${taskGid}`, {
+    await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}`, {
         method: 'PUT',
         body: JSON.stringify({ data: updateData }),
     }), `update task ${taskGid}`);
@@ -43607,11 +44296,31 @@ function readRulesConfig() {
     const asanaToken = core.getInput('asana_token', { required: true });
     const githubToken = core.getInput('github_token', { required: true });
     const rulesYaml = core.getInput('rules', { required: true });
+    // Parse optional user mappings (JSON string)
+    const userMappingsInput = core.getInput('user_mappings');
+    let userMappings = {};
+    if (userMappingsInput) {
+        try {
+            userMappings = JSON.parse(userMappingsInput);
+            core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Invalid user_mappings JSON: ${errorMessage}`);
+        }
+    }
+    // Get optional integration secret
+    const integrationSecret = core.getInput('integration_secret') || undefined;
+    if (integrationSecret) {
+        core.info(`✓ Integration secret provided`);
+    }
     const parsed = parseRulesYAML(rulesYaml);
     return {
         asanaToken,
         githubToken,
         rules: parsed,
+        userMappings,
+        integrationSecret,
     };
 }
 /**
@@ -43718,6 +44427,7 @@ exports.fetchPRComments = fetchPRComments;
 exports.postPRComment = postPRComment;
 exports.postMissingAsanaUrlPrompt = postMissingAsanaUrlPrompt;
 exports.postCommentTemplates = postCommentTemplates;
+exports.appendAsanaLinkToPR = appendAsanaLinkToPR;
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 /**
@@ -43859,6 +44569,41 @@ async function postCommentTemplates(commentTemplates, githubToken, prNumber, com
             core.error(`Failed to process comment template ${index + 1}: ${errorMessage}`);
             // Continue with other comments
         }
+    }
+}
+/**
+ * Append Asana task link to PR body
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ * @param taskName - Name of created task
+ * @param taskUrl - URL of created task
+ */
+async function appendAsanaLinkToPR(githubToken, prNumber, taskName, taskUrl) {
+    try {
+        const octokit = github.getOctokit(githubToken);
+        const { owner, repo } = github.context.repo;
+        // Fetch current PR data
+        const { data: pr } = await octokit.rest.pulls.get({
+            owner,
+            repo,
+            pull_number: prNumber,
+        });
+        const currentBody = pr.body || '';
+        // Append Asana link
+        const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+        await octokit.rest.pulls.update({
+            owner,
+            repo,
+            pull_number: prNumber,
+            body: newBody,
+        });
+        core.info(`✓ Added Asana link to PR #${prNumber}`);
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.error(`Failed to update PR body: ${errorMessage}`);
+        // Don't throw - this is not critical enough to fail the workflow
     }
 }
 
@@ -44080,9 +44825,12 @@ exports.rulesUseHelper = rulesUseHelper;
 function rulesUseHelper(rules, helperName) {
     const pattern = new RegExp(`\\{\\{\\s*${helperName}\\s+`, 'g');
     for (const rule of rules) {
-        for (const template of Object.values(rule.then.update_fields)) {
-            if (pattern.test(template)) {
-                return true;
+        // Check update_fields if present
+        if (rule.then.update_fields) {
+            for (const template of Object.values(rule.then.update_fields)) {
+                if (pattern.test(template)) {
+                    return true;
+                }
             }
         }
     }

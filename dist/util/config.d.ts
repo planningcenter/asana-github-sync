@@ -12,6 +12,8 @@ export declare function readRulesConfig(): {
     asanaToken: string;
     githubToken: string;
     rules: RulesConfig;
+    userMappings: Record<string, string>;
+    integrationSecret: string | undefined;
 };
 /**
  * Parse rules YAML string

@@ -41,4 +41,5 @@ export interface HandlebarsContext {
   event: EventContext;
   label?: LabelContext;
   comments?: string; // All PR comments concatenated (if fetched)
+  userMappings?: Record<string, string>; // GitHub username → Asana user GID mapping
 }

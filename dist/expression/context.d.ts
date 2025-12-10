@@ -37,5 +37,6 @@ export interface HandlebarsContext {
     event: EventContext;
     label?: LabelContext;
     comments?: string;
+    userMappings?: Record<string, string>;
 }
 //# sourceMappingURL=context.d.ts.map

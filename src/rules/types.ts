@@ -12,13 +12,31 @@ export interface Condition {
   merged?: boolean; // Optional: PR merged status
   draft?: boolean; // Optional: PR draft status
   label?: string; // Optional: Exact label name match
+  has_asana_tasks?: boolean; // Optional: Whether PR has Asana task links (default: true)
+  author?: string | string[]; // Optional: PR author username(s)
+}
+
+/**
+ * Task creation action - defines properties for creating a new Asana task
+ */
+export interface CreateTaskAction {
+  project: string; // Required: Project GID
+  workspace: string; // Required: Workspace GID
+  section?: string; // Optional: Section GID for task placement
+  title: string; // Required: Task title (template string)
+  notes?: string; // Optional: Plain text notes (template string, mutually exclusive with html_notes)
+  html_notes?: string; // Optional: HTML formatted notes (template string, mutually exclusive with notes)
+  assignee?: string; // Optional: Assignee user GID or "me" (template string)
+  initial_fields?: Record<string, string>; // Optional: Initial custom field values (field GID → template)
+  remove_followers?: string[]; // Optional: Followers to remove after creation (e.g., ["me"])
 }
 
 /**
  * Action block - defines what to do when a rule matches
  */
 export interface Action {
-  update_fields: Record<string, string>; // Map of field GID → value (can be template string)
+  create_task?: CreateTaskAction; // Optional: Create a new Asana task
+  update_fields?: Record<string, string>; // Optional: Map of field GID → value (can be template string)
   mark_complete?: boolean; // Optional: Mark task complete
   post_pr_comment?: string; // Optional: Handlebars template for PR comment
 }
@@ -37,4 +55,6 @@ export interface Rule {
 export interface RulesConfig {
   rules: Rule[];
   comment_on_pr_when_asana_url_missing?: boolean; // Optional: Post comment when no Asana URL found (default: false)
+  user_mappings?: Record<string, string>; // Optional: GitHub username → Asana user GID
+  integration_secret?: string; // Optional: Asana-GitHub integration secret for rich PR attachments
 }
