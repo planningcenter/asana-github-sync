@@ -29,7 +29,7 @@ export function clearFieldSchemaCache(): void {
  * @returns Custom field definition
  */
 export async function fetchCustomField(token: string, customFieldGid: string) {
-  core.info(`Fetching custom field ${customFieldGid}...`);
+  core.debug(`Fetching custom field ${customFieldGid}...`);
   return await withRetry(
     () => asanaRequest<AsanaCustomField>(token, `/custom_fields/${customFieldGid}`),
     `fetch custom field ${customFieldGid}`

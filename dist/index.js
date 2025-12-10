@@ -42875,20 +42875,20 @@ async function run() {
         const { asanaToken, githubToken, rules, userMappings, integrationSecret } = (0, config_1.readRulesConfig)();
         (0, validator_1.validateRulesConfig)(rules);
         core.info(`✓ Rules configuration loaded`);
-        core.info(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
-        core.info(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
-        core.info(`  - Rules: ${rules.rules.length} rule(s) configured`);
+        core.debug(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
+        core.debug(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
+        core.debug(`  - Rules: ${rules.rules.length} rule(s) configured`);
         if (Object.keys(userMappings).length > 0) {
-            core.info(`  - User mappings: ${Object.keys(userMappings).length} mapping(s)`);
+            core.debug(`  - User mappings: ${Object.keys(userMappings).length} mapping(s)`);
         }
         if (integrationSecret) {
-            core.info(`  - Integration secret: configured`);
+            core.debug(`  - Integration secret: configured`);
         }
         // Check if any rule uses extract_from_comments helper
         const needsComments = (0, template_analysis_1.rulesUseHelper)(rules.rules, 'extract_from_comments');
         let comments;
         if (needsComments) {
-            core.info('Rules use extract_from_comments, fetching PR comments...');
+            core.debug('Rules use extract_from_comments, fetching PR comments...');
             const prNumber = github.context.payload.pull_request?.number;
             if (prNumber) {
                 comments = await (0, github_1.fetchPRComments)(githubToken, prNumber);
@@ -43204,7 +43204,7 @@ function executeRules(rules, context) {
             core.debug(`Rule ${index}: condition not met`);
             continue;
         }
-        core.info(`Rule ${index}: condition matched, executing action`);
+        core.debug(`Rule ${index}: condition matched, executing action`);
         // Convert to Handlebars context for template evaluation
         const handlebarsContext = {
             pr: context.pr,
@@ -43221,7 +43221,7 @@ function executeRules(rules, context) {
             try {
                 const spec = evaluateCreateTaskSpec(rule.then.create_task, handlebarsContext, index);
                 taskCreationSpecs.push(spec);
-                core.info(`  Will create task: "${spec.evaluatedTitle}"`);
+                core.debug(`  Will create task: "${spec.evaluatedTitle}"`);
             }
             catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
@@ -43238,12 +43238,12 @@ function executeRules(rules, context) {
                     // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
                     // TODO(docs): Document this behavior - fields with empty template results are skipped
                     if (value === '') {
-                        core.info(`  Field ${fieldGid} skipped (empty value)`);
+                        core.debug(`  Field ${fieldGid} skipped (empty value)`);
                         continue;
                     }
                     // Last rule wins for conflicting fields
                     fieldUpdates.set(fieldGid, value);
-                    core.info(`  Field ${fieldGid} = "${value}"`);
+                    core.debug(`  Field ${fieldGid} = "${value}"`);
                 }
                 catch (error) {
                     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -43259,12 +43259,12 @@ function executeRules(rules, context) {
         // Aggregate attach_pr_to_tasks flag (any rule can set it)
         if (rule.then.attach_pr_to_tasks) {
             attachPrToTasks = true;
-            core.info(`  Will attach PR to existing Asana tasks`);
+            core.debug(`  Will attach PR to existing Asana tasks`);
         }
         // Collect comment template if present
         if (rule.then.post_pr_comment) {
             commentTemplates.push(rule.then.post_pr_comment);
-            core.info(`  Will post PR comment (template ${commentTemplates.length})`);
+            core.debug(`  Will post PR comment (template ${commentTemplates.length})`);
         }
     }
     // Add special flag for task completion
@@ -43693,7 +43693,7 @@ const fields_1 = __nccwpck_require__(836);
  */
 async function createTask(spec, asanaToken, integrationSecret, prMetadata) {
     const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } = spec;
-    core.info(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
+    core.debug(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
     // Build task data
     const taskData = {
         name: evaluatedTitle,
@@ -43788,7 +43788,7 @@ async function removeTaskFollowers(taskGid, followers, asanaToken) {
             body: JSON.stringify({ data: { followers: [follower] } }),
         }), `remove follower ${follower}`);
     }
-    core.info(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
+    core.debug(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
 }
 /**
  * Attach PR via Asana-GitHub integration for rich formatting
@@ -43798,7 +43798,7 @@ async function removeTaskFollowers(taskGid, followers, asanaToken) {
  * @param integrationSecret - Integration secret
  */
 async function attachPRViaIntegration(taskUrl, prMetadata, integrationSecret) {
-    core.info(`Attaching PR ${prMetadata.url} to task via integration...`);
+    core.debug(`Attaching PR ${prMetadata.url} to task via integration...`);
     // Build full PR description including task link (matching reference implementation)
     const prDescription = `${prMetadata.body || ''}\n\n---\n\nAsana task: [${taskUrl}](${taskUrl})`;
     const payload = {
@@ -43975,7 +43975,7 @@ function clearFieldSchemaCache() {
  * @returns Custom field definition
  */
 async function fetchCustomField(token, customFieldGid) {
-    core.info(`Fetching custom field ${customFieldGid}...`);
+    core.debug(`Fetching custom field ${customFieldGid}...`);
     return await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(token, `/custom_fields/${customFieldGid}`), `fetch custom field ${customFieldGid}`);
 }
 /**
@@ -44351,7 +44351,7 @@ async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
                 continue; // Skip this field if validation failed
             }
             customFields[fieldGid] = coercedValue;
-            core.info(`  ✓ Field ${fieldGid} (${schema.type}): "${rawValue}" → ${coercedValue}`);
+            core.debug(`  ✓ Field ${fieldGid} (${schema.type}): "${rawValue}" → ${coercedValue}`);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -44372,7 +44372,7 @@ async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
         updateData.completed = true;
     }
     // Single PUT request
-    core.info(`Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`);
+    core.debug(`Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`);
     await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}`, {
         method: 'PUT',
         body: JSON.stringify({ data: updateData }),
@@ -44618,7 +44618,7 @@ async function fetchPRComments(githubToken, prNumber) {
             per_page: 100,
         });
         const comments = commentsResponse.data.map(c => c.body || '').join('\n');
-        core.info(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`);
+        core.debug(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`);
         return comments;
     }
     catch (error) {
@@ -44697,7 +44697,7 @@ async function postCommentTemplates(commentTemplates, githubToken, prNumber, com
             }
             // Check for duplicate comment
             if (existingBodies.has(commentBody)) {
-                core.info(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
+                core.debug(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
                 continue;
             }
             await postPRComment(githubToken, prNumber, commentBody);

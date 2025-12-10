@@ -207,7 +207,7 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
       continue;
     }
 
-    core.info(`Rule ${index}: condition matched, executing action`);
+    core.debug(`Rule ${index}: condition matched, executing action`);
 
     // Convert to Handlebars context for template evaluation
     const handlebarsContext = {
@@ -226,7 +226,7 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
       try {
         const spec = evaluateCreateTaskSpec(rule.then.create_task, handlebarsContext, index);
         taskCreationSpecs.push(spec);
-        core.info(`  Will create task: "${spec.evaluatedTitle}"`);
+        core.debug(`  Will create task: "${spec.evaluatedTitle}"`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         core.error(`Failed to evaluate create_task for rule ${index}: ${errorMessage}`);
@@ -244,13 +244,13 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
           // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
           // TODO(docs): Document this behavior - fields with empty template results are skipped
           if (value === '') {
-            core.info(`  Field ${fieldGid} skipped (empty value)`);
+            core.debug(`  Field ${fieldGid} skipped (empty value)`);
             continue;
           }
 
           // Last rule wins for conflicting fields
           fieldUpdates.set(fieldGid, value);
-          core.info(`  Field ${fieldGid} = "${value}"`);
+          core.debug(`  Field ${fieldGid} = "${value}"`);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           core.error(`Failed to evaluate field ${fieldGid}: ${errorMessage}`);
@@ -267,13 +267,13 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
     // Aggregate attach_pr_to_tasks flag (any rule can set it)
     if (rule.then.attach_pr_to_tasks) {
       attachPrToTasks = true;
-      core.info(`  Will attach PR to existing Asana tasks`);
+      core.debug(`  Will attach PR to existing Asana tasks`);
     }
 
     // Collect comment template if present
     if (rule.then.post_pr_comment) {
       commentTemplates.push(rule.then.post_pr_comment);
-      core.info(`  Will post PR comment (template ${commentTemplates.length})`);
+      core.debug(`  Will post PR comment (template ${commentTemplates.length})`);
     }
   }
 
