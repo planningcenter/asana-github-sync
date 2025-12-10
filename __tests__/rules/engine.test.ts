@@ -218,7 +218,7 @@ describe('executeRules', () => {
     const { fieldUpdates } = executeRules(rules, baseContext);
 
     expect(fieldUpdates.get('1234')).toBe('In Review');
-    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('Rule 0: condition matched'));
+    expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('Rule 0: condition matched'));
   });
 
   test('skips non-matching rule', () => {

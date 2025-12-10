@@ -178,7 +178,7 @@ describe('validateRulesConfig', () => {
     } as unknown as RulesConfig;
 
     expect(() => validateRulesConfig(config)).toThrow(
-      "Rule 0: must have at least one action (update_fields, mark_complete, or post_pr_comment)"
+      "Rule 0: must have at least one action (update_fields, mark_complete, attach_pr_to_tasks, or post_pr_comment)"
     );
   });
 
@@ -206,7 +206,7 @@ describe('validateRulesConfig', () => {
     };
 
     expect(() => validateRulesConfig(config)).toThrow(
-      "Rule 0: must have at least one action (update_fields, mark_complete, or post_pr_comment)"
+      "Rule 0: must have at least one action (update_fields, mark_complete, attach_pr_to_tasks, or post_pr_comment)"
     );
   });
 
@@ -283,7 +283,7 @@ describe('validateRulesConfig', () => {
     } as unknown as RulesConfig;
 
     expect(() => validateRulesConfig(config)).toThrow(
-      "Rule 1: must have at least one action (update_fields, mark_complete, or post_pr_comment)"
+      "Rule 1: must have at least one action (update_fields, mark_complete, attach_pr_to_tasks, or post_pr_comment)"
     );
   });
 });

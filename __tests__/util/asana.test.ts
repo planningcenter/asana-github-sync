@@ -3,7 +3,7 @@
  * Focuses on field type coercion and validation
  */
 
-import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll, mock, spyOn } from 'bun:test';
+import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll, spyOn } from 'bun:test';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { updateTaskFields, clearFieldSchemaCache } from '../../src/util/asana';
@@ -64,7 +64,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 1111111111 (enum): "In Review" → enum-2')
       );
     });
@@ -122,7 +122,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 2222222222 (text): "Build 456" → Build 456')
       );
     });
@@ -148,7 +148,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 2222222222 (multi_line_text):')
       );
     });
@@ -174,7 +174,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 2222222222 (text): "" →')
       );
     });
@@ -202,7 +202,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 3333333333 (number): "123" → 123')
       );
     });
@@ -228,7 +228,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 3333333333 (number): "-42" → -42')
       );
     });
@@ -254,7 +254,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 3333333333 (number): "0" → 0')
       );
     });
@@ -280,7 +280,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 3333333333 (number): "3.14" → 3.14')
       );
     });
@@ -380,7 +380,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 4444444444 (date): "2024-01-15" → 2024-01-15')
       );
     });
@@ -406,7 +406,7 @@ describe('Asana Field Type System', () => {
 
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 4444444444 (date): "2024-02-29" → 2024-02-29')
       );
     });
@@ -593,12 +593,12 @@ describe('Asana Field Type System', () => {
       await updateTaskFields(mockTaskGid, fieldUpdates, mockAsanaToken);
 
       // Verify all fields were logged as updated
-      expect(core.info).toHaveBeenCalledWith(expect.stringContaining('✓ Field 1111111111 (enum)'));
-      expect(core.info).toHaveBeenCalledWith(expect.stringContaining('✓ Field 2222222222 (text)'));
-      expect(core.info).toHaveBeenCalledWith(
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('✓ Field 1111111111 (enum)'));
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('✓ Field 2222222222 (text)'));
+      expect(core.debug).toHaveBeenCalledWith(
         expect.stringContaining('✓ Field 3333333333 (number)')
       );
-      expect(core.info).toHaveBeenCalledWith(expect.stringContaining('✓ Field 4444444444 (date)'));
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('✓ Field 4444444444 (date)'));
     });
 
     test('continues with valid fields when some are invalid', async () => {
@@ -650,8 +650,8 @@ describe('Asana Field Type System', () => {
       );
 
       // Valid fields should be updated
-      expect(core.info).toHaveBeenCalledWith(expect.stringContaining('✓ Field 2222222222 (text)'));
-      expect(core.info).toHaveBeenCalledWith(expect.stringContaining('✓ Field 4444444444 (date)'));
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('✓ Field 2222222222 (text)'));
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('✓ Field 4444444444 (date)'));
     });
   });
 
