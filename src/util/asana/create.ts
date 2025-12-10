@@ -174,7 +174,7 @@ async function removeTaskFollowers(taskGid: string, followers: string[], asanaTo
  * @param prMetadata - PR metadata (number, title, body, url)
  * @param integrationSecret - Integration secret
  */
-async function attachPRViaIntegration(
+export async function attachPRViaIntegration(
   taskUrl: string,
   prMetadata: PRMetadata,
   integrationSecret: string,
@@ -260,4 +260,44 @@ export async function createAllTasks(
   }
 
   return results;
+}
+
+/**
+ * Attach PR to existing Asana tasks via integration
+ * Checks for existing links before attaching to avoid duplicates
+ *
+ * @param taskResults - Array of task results to attach PR to
+ * @param prMetadata - PR metadata for integration attachment
+ * @param asanaToken - Asana API token (for checking existing links)
+ * @param integrationSecret - Integration secret for attachment
+ */
+export async function attachPRToExistingTasks(
+  taskResults: Array<{ gid: string; name: string; url: string; success: boolean }>,
+  prMetadata: PRMetadata,
+  asanaToken: string,
+  integrationSecret: string
+): Promise<void> {
+  const { checkIfPRAlreadyLinked } = await import('./tasks');
+
+  core.info('Attaching PR to existing Asana tasks...');
+
+  for (const taskResult of taskResults) {
+    if (!taskResult.success) {
+      continue; // Skip failed tasks
+    }
+
+    try {
+      // Check if PR is already linked
+      const alreadyLinked = await checkIfPRAlreadyLinked(taskResult.gid, prMetadata.url, asanaToken);
+
+      if (!alreadyLinked) {
+        await attachPRViaIntegration(taskResult.url, prMetadata, integrationSecret);
+        core.info(`✓ Attached PR to task ${taskResult.gid}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.warning(`Failed to attach PR to task ${taskResult.gid}: ${errorMessage}`);
+      // Continue with other tasks
+    }
+  }
 }
