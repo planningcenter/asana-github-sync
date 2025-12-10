@@ -82,7 +82,6 @@ jobs:
           asana_token: ${{ secrets.ASANA_PERSONAL_ACCESS_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           rules: |
-            comment_on_pr_when_asana_url_missing: true
             rules:
               - when:
                   event: pull_request
@@ -287,3 +286,27 @@ jobs:
 4. **Title format:** The `{{clean_title pr.title}}` helper matches the old `cleanTitle()` function behavior, removing conventional commit prefixes.
 
 5. **Skip if exists:** The `has_asana_tasks: false` condition automatically handles the "skip if PR already has Asana task" logic.
+
+## Commenting when Asana URL is Missing
+
+If you want to prompt for an Asana URL when one is missing (similar to the old `comment_on_pr_when_asana_url_missing` option), use a rule with the `has_asana_tasks: false` condition:
+
+```yaml
+rules:
+  # Post comment when PR is opened without Asana task
+  - when:
+      event: pull_request
+      action: opened
+      has_asana_tasks: false
+    then:
+      post_pr_comment: |
+        Please add the Asana task URL to this PR description so the workflow can update the Asana custom fields.
+
+        Example:
+        - https://app.asana.com/0/<project_id>/<task_id>
+```
+
+This gives you more flexibility than the old boolean option:
+- Customize the message
+- Trigger on different events/actions
+- Combine with other conditions (e.g., only for certain labels or authors)

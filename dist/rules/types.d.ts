@@ -48,7 +48,6 @@ export interface Rule {
  */
 export interface RulesConfig {
     rules: Rule[];
-    comment_on_pr_when_asana_url_missing?: boolean;
     user_mappings?: Record<string, string>;
     integration_secret?: string;
 }

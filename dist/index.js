@@ -43000,13 +43000,6 @@ async function run() {
         else {
             // No tasks found and no task creation rules matched
             core.info('No Asana task links found in PR body');
-            // Post comment asking for Asana URL if configured
-            if (rules.comment_on_pr_when_asana_url_missing) {
-                const prNumber = github.context.payload.pull_request?.number;
-                if (prNumber) {
-                    await (0, github_2.postMissingAsanaUrlPrompt)(githubToken, prNumber);
-                }
-            }
         }
     }
     catch (error) {
@@ -44444,7 +44437,6 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.fetchPRComments = fetchPRComments;
 exports.postPRComment = postPRComment;
-exports.postMissingAsanaUrlPrompt = postMissingAsanaUrlPrompt;
 exports.postCommentTemplates = postCommentTemplates;
 exports.appendAsanaLinkToPR = appendAsanaLinkToPR;
 const core = __importStar(__nccwpck_require__(7484));
@@ -44499,36 +44491,6 @@ async function postPRComment(githubToken, prNumber, body) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         // Don't fail workflow, just log error
         core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
-    }
-}
-/**
- * Post a comment prompting for Asana URL if not already posted
- *
- * @param githubToken - GitHub authentication token
- * @param prNumber - Pull request number
- */
-async function postMissingAsanaUrlPrompt(githubToken, prNumber) {
-    const promptText = 'Please add the Asana task URL to this PR description so the workflow can update the Asana custom fields.\n\nExample:\n- https://app.asana.com/0/<project_id>/<task_id>';
-    try {
-        const octokit = github.getOctokit(githubToken);
-        const { owner, repo } = github.context.repo;
-        // Check if we've already posted this prompt
-        const { data: comments } = await octokit.rest.issues.listComments({
-            owner,
-            repo,
-            issue_number: prNumber,
-        });
-        const alreadyPosted = comments.some(c => c.body?.includes('Please add the Asana task URL to this PR description'));
-        if (alreadyPosted) {
-            core.info('Asana URL prompt already posted, skipping');
-            return;
-        }
-        await postPRComment(githubToken, prNumber, promptText);
-        core.info('✓ Posted comment asking for Asana task URL');
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        core.warning(`Failed to post Asana URL prompt: ${errorMessage}`);
     }
 }
 /**

@@ -13,7 +13,7 @@ import { fetchAllTaskDetails, updateAllTasks, createAllTasks } from './util/asan
 import { appendAsanaLinkToPR } from './util/github';
 import { registerHelpers } from './expression/helpers';
 import { rulesUseHelper } from './util/template-analysis';
-import { fetchPRComments, postCommentTemplates, postMissingAsanaUrlPrompt } from './util/github';
+import { fetchPRComments, postCommentTemplates } from './util/github';
 import { evaluateTemplate } from './expression/evaluator';
 
 /**
@@ -189,14 +189,6 @@ async function run(): Promise<void> {
     } else {
       // No tasks found and no task creation rules matched
       core.info('No Asana task links found in PR body');
-
-      // Post comment asking for Asana URL if configured
-      if (rules.comment_on_pr_when_asana_url_missing) {
-        const prNumber = github.context.payload.pull_request?.number;
-        if (prNumber) {
-          await postMissingAsanaUrlPrompt(githubToken, prNumber);
-        }
-      }
     }
 
   } catch (error) {

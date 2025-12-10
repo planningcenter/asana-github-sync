@@ -67,43 +67,6 @@ export async function postPRComment(
 }
 
 /**
- * Post a comment prompting for Asana URL if not already posted
- *
- * @param githubToken - GitHub authentication token
- * @param prNumber - Pull request number
- */
-export async function postMissingAsanaUrlPrompt(
-  githubToken: string,
-  prNumber: number
-): Promise<void> {
-  const promptText = 'Please add the Asana task URL to this PR description so the workflow can update the Asana custom fields.\n\nExample:\n- https://app.asana.com/0/<project_id>/<task_id>';
-
-  try {
-    const octokit = github.getOctokit(githubToken);
-    const { owner, repo } = github.context.repo;
-
-    // Check if we've already posted this prompt
-    const { data: comments } = await octokit.rest.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-    });
-
-    const alreadyPosted = comments.some(c => c.body?.includes('Please add the Asana task URL to this PR description'));
-    if (alreadyPosted) {
-      core.info('Asana URL prompt already posted, skipping');
-      return;
-    }
-
-    await postPRComment(githubToken, prNumber, promptText);
-    core.info('✓ Posted comment asking for Asana task URL');
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    core.warning(`Failed to post Asana URL prompt: ${errorMessage}`);
-  }
-}
-
-/**
  * Evaluate and post multiple comment templates to a PR with deduplication
  *
  * @param commentTemplates - Array of Handlebars templates

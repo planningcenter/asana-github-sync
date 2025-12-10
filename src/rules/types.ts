@@ -54,7 +54,6 @@ export interface Rule {
  */
 export interface RulesConfig {
   rules: Rule[];
-  comment_on_pr_when_asana_url_missing?: boolean; // Optional: Post comment when no Asana URL found (default: false)
   user_mappings?: Record<string, string>; // Optional: GitHub username → Asana user GID
   integration_secret?: string; // Optional: Asana-GitHub integration secret for rich PR attachments
 }
