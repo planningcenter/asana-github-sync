@@ -2,17 +2,25 @@
  * Tests for rules engine
  */
 
+import { describe, test, expect, beforeEach, beforeAll, spyOn } from 'bun:test';
 import * as core from '@actions/core';
 import { matchesCondition, executeRules, RuleContext } from '../../src/rules/engine';
 import { Rule, Condition } from '../../src/rules/types';
 
-// Mock @actions/core
-jest.mock('@actions/core');
+// Create spies for @actions/core
+const infoSpy = spyOn(core, 'info').mockImplementation(() => {});
+const errorSpy = spyOn(core, 'error').mockImplementation(() => {});
+const warningSpy = spyOn(core, 'warning').mockImplementation(() => {});
+const debugSpy = spyOn(core, 'debug').mockImplementation(() => {});
 
 describe('matchesCondition', () => {
   let baseContext: RuleContext;
 
   beforeEach(() => {
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
     baseContext = {
       eventName: 'pull_request',
       action: 'opened',
@@ -134,7 +142,10 @@ describe('executeRules', () => {
   let baseContext: RuleContext;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
 
     baseContext = {
       eventName: 'pull_request',

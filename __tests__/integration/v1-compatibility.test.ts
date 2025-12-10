@@ -6,17 +6,21 @@
  * - PR merged → "Shipped" + mark complete
  */
 
+import { describe, test, expect, beforeEach, spyOn, mock } from 'bun:test';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readRulesConfig } from '../../src/util/config';
 import { validateRulesConfig } from '../../src/rules/validator';
 import { buildRuleContext, executeRules } from '../../src/rules/engine';
 
-// Mock @actions/core
-jest.mock('@actions/core');
+// Create spies for @actions/core
+const infoSpy = spyOn(core, 'info').mockImplementation(() => {});
+const errorSpy = spyOn(core, 'error').mockImplementation(() => {});
+const warningSpy = spyOn(core, 'warning').mockImplementation(() => {});
+const debugSpy = spyOn(core, 'debug').mockImplementation(() => {});
 
 // Mock @actions/github
-jest.mock('@actions/github', () => ({
+mock.module('@actions/github', () => ({
   context: {
     eventName: 'pull_request',
     payload: {
@@ -58,10 +62,13 @@ rules:
 `;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
 
     // Mock core.getInput to return test configuration
-    (core.getInput as jest.Mock).mockImplementation((name: string) => {
+    spyOn(core, 'getInput').mockImplementation((name: string) => {
       if (name === 'asana_token') return 'test_token_123';
       if (name === 'github_token') return 'ghp_test_token';
       if (name === 'rules') return v1EquivalentRules;

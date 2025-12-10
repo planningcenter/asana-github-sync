@@ -2,19 +2,26 @@
  * Tests for Handlebars evaluator
  */
 
+import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import * as core from '@actions/core';
 import { evaluateTemplate } from '../../src/expression/evaluator';
 import { HandlebarsContext } from '../../src/expression/context';
 
-// Mock @actions/core
-jest.mock('@actions/core');
+// Create spies for @actions/core
+const infoSpy = spyOn(core, 'info').mockImplementation(() => {});
+const errorSpy = spyOn(core, 'error').mockImplementation(() => {});
+const warningSpy = spyOn(core, 'warning').mockImplementation(() => {});
+const debugSpy = spyOn(core, 'debug').mockImplementation(() => {});
 
 describe('evaluateTemplate', () => {
   let mockContext: HandlebarsContext;
 
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks();
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
 
     // Create standard test context
     mockContext = {

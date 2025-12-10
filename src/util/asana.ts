@@ -10,6 +10,20 @@ import { ApiError } from './errors';
 const ASANA_API_BASE = 'https://app.asana.com/api/1.0';
 
 /**
+ * Module-level cache for custom field schemas
+ * Persists for the lifetime of the action run to avoid redundant API calls
+ * when updating multiple tasks with the same fields
+ */
+const fieldSchemaCache = new Map<string, AsanaCustomField>();
+
+/**
+ * Clear the field schema cache (primarily for testing)
+ */
+export function clearFieldSchemaCache(): void {
+  fieldSchemaCache.clear();
+}
+
+/**
  * Make an authenticated request to the Asana API
  *
  * @param token - Asana Personal Access Token
@@ -47,7 +61,7 @@ async function asanaRequest<T = unknown>(token: string, endpoint: string, option
  * @param customFieldGid - Custom field GID
  * @returns Custom field definition
  */
-async function fetchCustomField(token: string, customFieldGid: string): Promise<AsanaCustomField> {
+async function fetchCustomField(token: string, customFieldGid: string) {
   core.info(`Fetching custom field ${customFieldGid}...`);
   return await withRetry(
     () => asanaRequest<AsanaCustomField>(token, `/custom_fields/${customFieldGid}`),
@@ -87,6 +101,69 @@ function findEnumOption(customField: AsanaCustomField, stateName: string, custom
 }
 
 /**
+ * Coerce a raw string value to the appropriate type for an Asana custom field
+ * Returns null if the value is invalid for the field type
+ *
+ * @param schema - The custom field schema from Asana
+ * @param rawValue - The raw string value from template evaluation
+ * @param fieldGid - The field GID (for error messages)
+ * @returns The coerced value, or null if validation fails
+ */
+function coerceFieldValue(
+  schema: AsanaCustomField,
+  rawValue: string,
+  fieldGid: string
+) {
+  switch (schema.type) {
+    case 'enum':
+      // Find matching enum option
+      const enumGid = findEnumOption(schema, rawValue, fieldGid);
+      if (!enumGid) {
+        core.error(`Cannot update field ${fieldGid}: enum option "${rawValue}" not found`);
+        return null;
+      }
+      return enumGid;
+
+    case 'text':
+    case 'multi_line_text':
+      // Text fields: use string as-is
+      return rawValue;
+
+    case 'number':
+      // Number fields: parse and validate
+      const numberValue = Number(rawValue);
+      if (isNaN(numberValue)) {
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid number`);
+        return null;
+      }
+      return numberValue;
+
+    case 'date':
+      // Date fields: validate ISO 8601 format (YYYY-MM-DD)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" must be YYYY-MM-DD format`);
+        return null;
+      }
+      // Validate it's an actual valid date (check if parsing changes the value)
+      const dateObj = new Date(rawValue);
+      if (isNaN(dateObj.getTime())) {
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`);
+        return null;
+      }
+      const roundTrip = dateObj.toISOString().split('T')[0];
+      if (roundTrip !== rawValue) {
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`);
+        return null;
+      }
+      return rawValue;
+
+    default:
+      core.warning(`Field ${fieldGid} has unsupported type '${schema.type}'. Skipping.`);
+      return null;
+  }
+}
+
+/**
  * Update Asana task with field updates from rules engine (v2)
  *
  * @param taskGid - Task GID to update
@@ -98,11 +175,8 @@ export async function updateTaskFields(
   fieldUpdates: Map<string, string>,
   asanaToken: string
 ): Promise<void> {
-  const customFields: Record<string, string> = {};
+  const customFields: Record<string, string | number> = {};
   const shouldMarkComplete = fieldUpdates.has('__mark_complete');
-
-  // Cache for fetched custom field schemas
-  const fieldSchemaCache = new Map<string, AsanaCustomField>();
 
   // Process each field update
   for (const [fieldGid, rawValue] of fieldUpdates.entries()) {
@@ -116,23 +190,14 @@ export async function updateTaskFields(
         fieldSchemaCache.set(fieldGid, schema);
       }
 
-      // For MVP, we only support enum fields
-      if (schema.type !== 'enum') {
-        core.warning(
-          `Field ${fieldGid} is type '${schema.type}', not 'enum'. Only enum fields supported in MVP.`
-        );
-        continue;
+      // Coerce the value to the appropriate type
+      const coercedValue = coerceFieldValue(schema, rawValue, fieldGid);
+      if (coercedValue === null) {
+        continue; // Skip this field if validation failed
       }
 
-      // Find matching enum option
-      const enumGid = findEnumOption(schema, rawValue, fieldGid);
-      if (!enumGid) {
-        core.error(`Cannot update field ${fieldGid}: value "${rawValue}" not found`);
-        continue;
-      }
-
-      customFields[fieldGid] = enumGid;
-      core.info(`  ✓ Field ${fieldGid} (enum): "${rawValue}" → ${enumGid}`);
+      customFields[fieldGid] = coercedValue;
+      core.info(`  ✓ Field ${fieldGid} (${schema.type}): "${rawValue}" → ${coercedValue}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       core.error(`Skipping field ${fieldGid}: ${errorMessage}`);

@@ -2,13 +2,17 @@
  * Tests for Handlebars extraction helpers
  */
 
+import { describe, test, expect, beforeAll, beforeEach, spyOn } from 'bun:test';
 import * as core from '@actions/core';
 import Handlebars from 'handlebars';
 import { registerHelpers } from '../../src/expression/helpers';
 import { HandlebarsContext } from '../../src/expression/context';
 
-// Mock @actions/core
-jest.mock('@actions/core');
+// Create spies for @actions/core
+const infoSpy = spyOn(core, 'info').mockImplementation(() => {});
+const errorSpy = spyOn(core, 'error').mockImplementation(() => {});
+const warningSpy = spyOn(core, 'warning').mockImplementation(() => {});
+const debugSpy = spyOn(core, 'debug').mockImplementation(() => {});
 
 describe('Handlebars Extraction Helpers', () => {
   beforeAll(() => {
@@ -17,7 +21,10 @@ describe('Handlebars Extraction Helpers', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
   });
 
   describe('extract_from_body', () => {
