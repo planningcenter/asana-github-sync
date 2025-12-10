@@ -25,6 +25,7 @@ export interface RuleContext {
     label?: {
         name: string;
     };
+    labels?: string[];
     comments?: string;
     hasAsanaTasks: boolean;
     userMappings?: Record<string, string>;

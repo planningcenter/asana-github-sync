@@ -29,6 +29,7 @@ export interface RuleContext {
   label?: {
     name: string;
   };
+  labels?: string[]; // Optional: All labels currently on the PR
   comments?: string; // All PR comments concatenated (if fetched)
   hasAsanaTasks: boolean; // Whether PR body contains Asana task links
   userMappings?: Record<string, string>; // GitHub username → Asana user GID mapping
@@ -80,6 +81,11 @@ export function buildRuleContext(
     };
   }
 
+  // Extract all label names from PR (if present)
+  if (pr.labels && Array.isArray(pr.labels)) {
+    context.labels = pr.labels.map((label) => label.name);
+  }
+
   if (comments !== undefined) {
     context.comments = comments;
   }
@@ -125,6 +131,18 @@ export function matchesCondition(condition: Condition, context: RuleContext): bo
   // Label (if specified) must match
   if (condition.label !== undefined) {
     if (!context.label || condition.label !== context.label.name) {
+      return false;
+    }
+  }
+
+  // has_labels (if specified) - PR must have at least one of the specified labels
+  if (condition.has_labels !== undefined) {
+    const requiredLabels = Array.isArray(condition.has_labels)
+      ? condition.has_labels
+      : [condition.has_labels];
+    const prLabels = context.labels || [];
+    const hasMatch = requiredLabels.some((label) => prLabels.includes(label));
+    if (!hasMatch) {
       return false;
     }
   }
