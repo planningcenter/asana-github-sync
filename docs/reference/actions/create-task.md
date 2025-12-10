@@ -44,7 +44,7 @@ then:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `section` | string | Section GID for task placement |
+| `section` | string | Section GID for task placement (defaults to project's default section if omitted) |
 | `notes` | string | Plain text description (template) |
 | `html_notes` | string | HTML formatted description (template) |
 | `assignee` | string | User GID, "me", or template |
@@ -194,6 +194,52 @@ rules:
 The integration user ('me') is **automatically removed** as a follower after task creation. You don't need to configure this.
 :::
 
+### PR Body Modification and Event Loops
+
+::: warning Important
+When a task is created, the action appends the Asana task link to the PR body. This triggers a `pull_request.edited` event in GitHub.
+:::
+
+**This can create infinite loops if you're not careful:**
+
+```yaml
+# ❌ DANGEROUS - Creates infinite loop!
+rules:
+  - when:
+      event: pull_request
+      action: edited  # This fires after task creation!
+      has_asana_tasks: false
+    then:
+      create_task:
+        # Creates task → appends link → triggers edited → creates task → ...
+```
+
+**Safe patterns:**
+
+```yaml
+# ✅ Safe - Only creates on 'opened'
+rules:
+  - when:
+      event: pull_request
+      action: opened
+      has_asana_tasks: false
+    then:
+      create_task:
+        # ...
+
+# ✅ Safe - 'edited' only updates existing tasks
+rules:
+  - when:
+      event: pull_request
+      action: edited
+      has_asana_tasks: true
+    then:
+      update_fields:
+        # ...
+```
+
+**Key insight:** Use `has_asana_tasks: false` only with actions like `opened`, `labeled`, or `ready_for_review` — never with `edited`.
+
 ### Notes vs HTML Notes
 
 You can only use **one** of:
@@ -216,6 +262,49 @@ All string fields support Handlebars templates:
 - `notes`/`html_notes`: `'{{sanitize_markdown pr.body}}'`
 - `assignee`: `'{{map_github_to_asana pr.author}}'`
 - `initial_fields` values: `'{{extract_from_body "Version: ([\\d.]+)"}}'`
+
+### Section Placement
+
+The `section` field controls where tasks appear in your Asana project.
+
+**When `section` is specified:**
+- Task is placed in the specified section
+- Section must exist in the project
+- Section GID must be valid (numeric string)
+
+**When `section` is omitted:**
+- Task is placed in the project's **default section**
+- For list projects: typically the first section or "Untitled section"
+- For board projects: typically the first column
+
+::: tip Finding Section GIDs
+Use the Asana API or browser DevTools to find section GIDs:
+
+```bash
+curl "https://app.asana.com/api/1.0/projects/{project}/sections" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+Each section has a `gid` field in the response.
+:::
+
+**Example with section:**
+```yaml
+create_task:
+  project: '1234567890'
+  workspace: '0987654321'
+  section: '1111111111'  # "Dependencies" section
+  title: '{{pr.title}}'
+```
+
+**Example without section (uses project default):**
+```yaml
+create_task:
+  project: '1234567890'
+  workspace: '0987654321'
+  # No section specified - goes to project's default
+  title: '{{pr.title}}'
+```
 
 ## Common Patterns
 

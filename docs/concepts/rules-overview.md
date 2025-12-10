@@ -122,30 +122,46 @@ when:
 
 ## Default Behaviors
 
-### Non-Draft PRs
+### Draft PR Matching
 
-By default, rules match **non-draft PRs only**:
+By default (when `draft` is omitted), rules match **both draft and non-draft PRs**:
 
 ```yaml
-# These are equivalent:
+# This matches ALL PRs (draft and non-draft):
 when:
   event: pull_request
   action: opened
-
-when:
-  event: pull_request
-  action: opened
-  draft: false  # Redundant - this is the default
+  # draft is not specified, so it matches both
 ```
 
-To match draft PRs:
+To match only non-draft PRs:
 
 ```yaml
 when:
   event: pull_request
   action: opened
-  draft: true  # Explicitly match drafts
+  draft: false  # Only match ready-for-review PRs
 ```
+
+To match only draft PRs:
+
+```yaml
+when:
+  event: pull_request
+  action: opened
+  draft: true  # Only match draft PRs
+```
+
+::: tip Best Practice
+Most teams should explicitly specify `draft: false` to avoid triggering rules on draft PRs:
+
+```yaml
+when:
+  event: pull_request
+  action: opened
+  draft: false  # Skip drafts
+```
+:::
 
 ### Has Asana Tasks
 
@@ -224,6 +240,117 @@ then:
 - Handlebars helpers - Text processing, extraction, user mapping
 
 See [Templates](/concepts/templates) for complete guide.
+
+## Rule Precedence
+
+### Multiple Rules Can Match
+
+All matching rules execute independently. If a PR matches multiple rules, all of them run:
+
+```yaml
+rules:
+  # Rule 1: All PRs
+  - when:
+      event: pull_request
+      action: opened
+    then:
+      update_fields:
+        '1111111111': '2222222222'
+
+  # Rule 2: Bot PRs (also matches!)
+  - when:
+      event: pull_request
+      action: opened
+      author: dependabot[bot]
+    then:
+      update_fields:
+        '3333333333': '4444444444'
+```
+
+For a dependabot PR, **both** rules execute because both conditions match.
+
+### Last Rule Wins for Conflicts
+
+When multiple rules update the **same field GID**, the last matching rule's value is used:
+
+```yaml
+rules:
+  # Rule 1: Sets field to "In Review"
+  - when:
+      event: pull_request
+      action: opened
+    then:
+      update_fields:
+        '1234567890': 'In Review'
+
+  # Rule 2: Sets same field to "Bot PR" (this wins!)
+  - when:
+      event: pull_request
+      action: opened
+      author: dependabot[bot]
+    then:
+      update_fields:
+        '1234567890': 'Bot PR'
+```
+
+For a dependabot PR, field `1234567890` will be set to `'Bot PR'` because Rule 2 comes last.
+
+::: tip Order Matters
+Rules are evaluated in the order they appear in your configuration. Put more specific rules **after** general rules to override field values.
+:::
+
+### Different Fields Don't Conflict
+
+Rules updating different fields all apply:
+
+```yaml
+rules:
+  - when:
+      event: pull_request
+      action: opened
+    then:
+      update_fields:
+        '1111111111': 'In Review'  # Status field
+        '2222222222': '{{pr.author}}'  # Author field
+
+  - when:
+      event: pull_request
+      action: opened
+      author: dependabot[bot]
+    then:
+      update_fields:
+        '3333333333': 'Bot'  # Type field (no conflict)
+```
+
+All three fields are updated for dependabot PRs.
+
+### Using Precedence Strategically
+
+**Pattern: General + Specific**
+
+```yaml
+rules:
+  # General rule for all PRs
+  - when:
+      event: pull_request
+      action: opened
+    then:
+      update_fields:
+        '1111111111': 'In Review'
+        '2222222222': 'Normal'
+
+  # Override for urgent PRs
+  - when:
+      event: pull_request
+      action: opened
+      label: urgent
+    then:
+      update_fields:
+        '2222222222': 'Urgent'  # Overrides 'Normal'
+        # '1111111111' stays 'In Review' from first rule
+```
+
+For urgent PRs: field `1111111111` = `'In Review'`, field `2222222222` = `'Urgent'`
 
 ## Validation
 

@@ -361,20 +361,54 @@ Templates are evaluated when:
 
 ### Empty Values
 
-Empty template results:
-- **update_fields:** Field update skipped
-- **create_task fields:** Empty string used
-- **Titles/notes:** Empty string used (might fail validation)
+::: warning Critical Behavior
+Templates that evaluate to **exactly** an empty string (`''`) trigger special handling. Whitespace is NOT considered empty—only the exact empty string.
+:::
+
+**How empty values are handled:**
+
+| Context | Behavior | Example |
+|---------|----------|---------|
+| `update_fields` | Field update is **skipped** | ✅ Safe |
+| `create_task.title` | Empty string used | ❌ Validation fails |
+| `create_task.notes` | Empty string used | ✅ Allowed |
+| `create_task.assignee` | Empty string used | ✅ No assignee set |
+| `create_task.initial_fields` | Field update **skipped** | ✅ Safe |
+
+**Important:** Only **exact empty strings** (`''`) are skipped. These are NOT empty:
+- `' '` (single space) → NOT skipped
+- `'\n'` (newline) → NOT skipped
+- `'  '` (multiple spaces) → NOT skipped
+
+**Examples:**
 
 ```yaml
 update_fields:
   '1111': '{{extract_from_body "TICKET-(\\d+)"}}'
-  # No match → empty string → field not updated ✓
+  # No match → '' (empty) → field update SKIPPED ✓
+
+update_fields:
+  '2222': 'Ticket: {{extract_from_body "TICKET-(\\d+)"}}'
+  # No match → 'Ticket: ' (NOT empty) → sets field to 'Ticket: ' ✗
 
 create_task:
   title: '{{extract_from_body "TICKET-(\\d+)"}}'
-  # No match → empty string → validation error ✗
+  # No match → '' (empty) → validation error (title required) ✗
+
+  title: '{{or (extract_from_body "TICKET-(\\d+)") pr.title}}'
+  # No match → uses pr.title → safe ✓
 ```
+
+::: tip Best Practice
+Use the `or` helper to provide fallback values:
+
+```yaml
+update_fields:
+  '1234567890': '{{or (extract_from_body "Version: ([\\d.]+)") "Unknown"}}'
+```
+
+This prevents empty values while maintaining graceful fallbacks.
+:::
 
 ## Escaping
 

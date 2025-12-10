@@ -228,6 +228,86 @@ All helpers work in comments:
 | `map_github_to_asana` | Map GitHub user | `{{map_github_to_asana pr.author}}` |
 | `or` | Fallback value | `{{or pr.assignee "Unassigned"}}` |
 
+## Comment Deduplication
+
+::: tip Automatic Deduplication
+The action automatically prevents duplicate comments when workflows re-run. Comments are deduplicated by **exact body match**.
+:::
+
+### How It Works
+
+Before posting a comment:
+1. Action fetches all existing PR comments
+2. Compares new comment body with existing comments
+3. If exact match found → skips posting
+4. If no match → posts the comment
+
+### Matching Rules
+
+Comments are considered duplicates if the **entire body text matches exactly**:
+
+```yaml
+# These are DIFFERENT (both will be posted):
+"✅ Task updated"
+"✅ Task Updated"  # Different capitalization
+
+# These are DIFFERENT:
+"✅ Task updated"
+"✅ Task updated "  # Extra space at end
+
+# These are THE SAME (only posted once):
+"✅ Task updated"
+"✅ Task updated"  # Exact match
+```
+
+::: warning Exact Match Only
+Even minor differences (whitespace, capitalization, punctuation) will result in a new comment being posted.
+:::
+
+### Dynamic Content and Deduplication
+
+If your comment includes dynamic values, each unique value combination creates a new comment:
+
+```yaml
+post_pr_comment: |
+  ✅ Task updated by {{pr.author}}
+```
+
+This will post:
+- "✅ Task updated by alice" (first run)
+- "✅ Task updated by bob" (different author, new comment)
+- "✅ Task updated by alice" (already exists, skipped)
+
+### Best Practices
+
+**Use static messages for notifications:**
+
+```yaml
+# ✅ Good - posts once per PR
+post_pr_comment: |
+  ✅ Asana task updated to "In Review"
+```
+
+**Or make dynamic content consistent:**
+
+```yaml
+# ✅ Good - predictable deduplication
+post_pr_comment: |
+  PR #{{pr.number}} is ready for review
+```
+
+**Avoid variable timestamps or changing data:**
+
+```yaml
+# ❌ Problematic - always posts (timestamp changes)
+post_pr_comment: |
+  Updated at {{current_time}}
+
+# ❌ Problematic - new comment every time status changes
+post_pr_comment: |
+  Current status: {{task.status}}
+```
+
 ## Common Patterns
 
 ### Status Update Notification

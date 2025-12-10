@@ -71,6 +71,21 @@ jobs:
 
 [Complete output documentation →](https://planningcenter.github.io/asana-github-sync/reference/inputs-outputs)
 
+## Error Handling
+
+**This action never fails your workflows.** All errors are logged but do not block PR operations.
+
+When sync failures occur:
+- ✅ Your PR workflow continues normally
+- ⚠️ Errors are logged to GitHub Actions output
+- ℹ️ Asana tasks may not reflect latest PR state
+
+This design ensures that Asana sync issues never prevent code from being merged or deployed.
+
+Check the Actions logs if you notice tasks are not updating as expected.
+
+[Complete error handling documentation →](https://planningcenter.github.io/asana-github-sync/reference/error-handling)
+
 ## License
 
 MIT

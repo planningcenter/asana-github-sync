@@ -30,7 +30,7 @@ jobs:
           rules: |
             rules:
               # Rule 1: PR opens → In Review
-              # (omitting 'draft' means non-draft PRs only by default)
+              # (matches both draft and non-draft PRs)
               - when:
                   event: pull_request
                   action: opened
@@ -80,8 +80,8 @@ when:
   # All conditions must match for rule to trigger
 ```
 
-::: tip Default Behavior
-By default, rules match **non-draft PRs only**. Omitting the `draft` condition is the most common pattern. Use `draft: true` to explicitly match draft PRs.
+::: warning Default Behavior
+By default (when `draft` is omitted), rules match **both draft and non-draft PRs**. Most teams should add `draft: false` to skip draft PRs. Use `draft: true` to explicitly match only draft PRs.
 :::
 
 ### Different Rules for Different Scenarios
@@ -99,8 +99,8 @@ when:
   draft: true  # Explicitly match draft PRs only
 ```
 
-::: info
-By default (when `draft` is omitted), rules only match non-draft PRs. You don't need to specify `draft: false`.
+::: tip
+When `draft` is omitted, rules match both draft and non-draft PRs. To skip drafts, add `draft: false`.
 :::
 
 ### Only Specific Authors

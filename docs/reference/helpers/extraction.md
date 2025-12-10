@@ -70,8 +70,21 @@ update_fields:
   '1234567890': '{{extract_from_comments "Build #(\\d+)"}}'
 ```
 
-::: warning
-`extract_from_comments` requires the workflow to fetch PR comments first. This happens automatically for certain event types.
+::: tip Automatic Comment Fetching
+The action **automatically detects** when your rules use `extract_from_comments` and only fetches PR comments when needed. You don't need to configure anything—it's optimized for you.
+:::
+
+**How it works:**
+1. Action analyzes your rules configuration at startup
+2. If any rule contains `extract_from_comments`, comments are fetched
+3. If no rule uses it, comments are NOT fetched (saves 1 API call)
+4. Comments are fetched once and reused for all rules
+
+::: info Performance Impact
+- **Without** `extract_from_comments`: 0 comment API calls
+- **With** `extract_from_comments`: 1 comment API call (regardless of how many rules use it)
+
+The optimization happens automatically—you don't need to worry about API efficiency.
 :::
 
 ## Regex Patterns

@@ -131,12 +131,25 @@ github_username: asana_user_gid
 ```
 
 **When needed:**
-Only if you have the [Asana GitHub integration](https://asana.com/apps/github) installed.
+Only if you have the [Asana GitHub integration](https://asana.com/apps/github) installed and want rich PR widgets in Asana.
 
-**Benefits:**
-- Rich PR attachments in Asana (shows status, checks, reviewers)
-- Automatic PR state updates
-- Better visibility without leaving Asana
+**Without integration_secret:**
+- Task gets a simple text link to the PR
+- No automatic updates when PR state changes
+- Still fully functional for field updates
+
+**With integration_secret:**
+- Tasks show a rich PR widget with:
+  - PR status badge (open/merged/closed)
+  - CI check statuses (passing/failing)
+  - Review status and reviewers
+  - Direct link to PR
+- Widget updates automatically when PR changes
+- Better team visibility from within Asana
+
+::: tip Optional but Recommended
+The integration secret is completely optional. The action works fine without it—you just won't get the fancy PR widgets in Asana. If you're setting this up for the first time, you can skip it and add it later.
+:::
 
 **How to get:**
 1. Go to https://github.integrations.asana.plus/auth?domainId=ghactions

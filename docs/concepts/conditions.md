@@ -83,8 +83,8 @@ when:
   draft: true  # Only draft PRs
 ```
 
-::: tip Default Behavior
-By default (when omitted), rules match **non-draft PRs only**. You rarely need `draft: false`.
+::: warning Default Behavior
+By default (when omitted), rules match **both draft and non-draft PRs**. Most teams should explicitly add `draft: false` to skip draft PRs.
 :::
 
 See [draft reference](/reference/conditions/draft).
@@ -207,15 +207,15 @@ when:
 
 ## Common Patterns
 
-### Non-Draft PRs (Default)
+### Non-Draft PRs
 
-Most rules target non-draft PRs. Simply omit `draft`:
+Most rules target non-draft PRs. Explicitly add `draft: false`:
 
 ```yaml
 when:
   event: pull_request
   action: opened
-  # No draft condition = non-draft only
+  draft: false  # Skip draft PRs
 ```
 
 ### Merged PRs

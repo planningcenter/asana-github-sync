@@ -154,7 +154,7 @@ Complete draft PRs when merged:
 ```
 
 ::: tip
-By default (omitting `draft`), rules only match non-draft PRs. The main example already skips draft PRs without needing `draft: false`.
+By default (omitting `draft`), rules match both draft and non-draft PRs. To skip draft PRs, explicitly add `draft: false` to your conditions.
 :::
 
 ## Common Issues
