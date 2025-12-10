@@ -12,7 +12,10 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
-    "all": "bun run format && bun run lint && bun run test && bun run package"
+    "all": "bun run format && bun run lint && bun run test && bun run package",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "github-action",
@@ -32,7 +35,9 @@
     "eslint": "^9.39.1",
     "eslint-plugin-jest": "^29.2.1",
     "msw": "^2.12.4",
-    "prettier": "^3.7.4"
+    "prettier": "^3.7.4",
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.25"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
