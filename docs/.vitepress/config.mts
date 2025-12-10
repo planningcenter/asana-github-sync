@@ -87,11 +87,10 @@ export default defineConfig({
           text: 'Examples',
           items: [
             { text: 'Basic Status Update', link: '/examples/basic-status-update' },
-            { text: 'Build Label Automation', link: '/examples/build-label-automation' },
-            { text: 'Description Change Sync', link: '/examples/description-change-sync' },
+            { text: 'Mark Complete on Merge', link: '/examples/mark-complete-on-merge' },
             { text: 'Bot Task Creation', link: '/examples/bot-task-creation' },
             { text: 'User Assigned Tasks', link: '/examples/user-assigned-tasks' },
-            { text: 'Mark Complete on Merge', link: '/examples/mark-complete-on-merge' },
+            { text: 'Build Label Automation', link: '/examples/build-label-automation' },
             { text: 'Multi-Condition Filtering', link: '/examples/multi-condition-filtering' },
           ]
         }
