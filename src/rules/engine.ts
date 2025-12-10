@@ -184,6 +184,7 @@ export interface RuleExecutionResult {
   fieldUpdates: Map<string, string>; // Map of field GID → evaluated value
   commentTemplates: string[]; // Array of PR comment templates from matching rules
   taskCreationSpecs: CreateTaskSpec[]; // Array of task creation specifications
+  attachPrToTasks: boolean; // Whether to attach PR to existing tasks via integration
 }
 
 /**
@@ -198,6 +199,7 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
   const commentTemplates: string[] = [];
   const taskCreationSpecs: CreateTaskSpec[] = [];
   let shouldMarkComplete = false;
+  let attachPrToTasks = false;
 
   for (const [index, rule] of rules.entries()) {
     if (!matchesCondition(rule.when, context)) {
@@ -262,6 +264,12 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
       shouldMarkComplete = true;
     }
 
+    // Aggregate attach_pr_to_tasks flag (any rule can set it)
+    if (rule.then.attach_pr_to_tasks) {
+      attachPrToTasks = true;
+      core.info(`  Will attach PR to existing Asana tasks`);
+    }
+
     // Collect comment template if present
     if (rule.then.post_pr_comment) {
       commentTemplates.push(rule.then.post_pr_comment);
@@ -274,7 +282,7 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
     fieldUpdates.set('__mark_complete', 'true');
   }
 
-  return { fieldUpdates, commentTemplates, taskCreationSpecs };
+  return { fieldUpdates, commentTemplates, taskCreationSpecs, attachPrToTasks };
 }
 
 /**

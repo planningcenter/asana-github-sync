@@ -9,7 +9,7 @@ import { readRulesConfig } from './util/config';
 import { validateRulesConfig } from './rules/validator';
 import { buildRuleContext, executeRules, buildCommentContext } from './rules/engine';
 import { extractAsanaTaskIds } from './util/parser';
-import { fetchAllTaskDetails, updateAllTasks, createAllTasks } from './util/asana';
+import { fetchAllTaskDetails, updateAllTasks, createAllTasks, attachPRToExistingTasks, type PRMetadata } from './util/asana';
 import { appendAsanaLinkToPR, fetchPRComments, postCommentTemplates } from './util/github';
 import { registerHelpers } from './expression/helpers';
 import { rulesUseHelper } from './util/template-analysis';
@@ -74,8 +74,8 @@ async function run(): Promise<void> {
     core.info(`PR #${context.pr.number}: ${context.pr.title}`);
     core.info(`has_asana_tasks: ${hasAsanaTasks}`);
 
-    // Execute rules to get field updates, comment templates, and task creation specs
-    const { fieldUpdates, commentTemplates, taskCreationSpecs } = executeRules(rules.rules, context);
+    // Execute rules to get field updates, comment templates, task creation specs, and attach flag
+    const { fieldUpdates, commentTemplates, taskCreationSpecs, attachPrToTasks } = executeRules(rules.rules, context);
 
     // SPLIT EXECUTION PATH: Task creation vs. updates
     if (taskCreationSpecs.length > 0) {
@@ -157,6 +157,20 @@ async function run(): Promise<void> {
 
       const successCount = taskResults.filter((t) => t.success).length;
       const failedCount = taskResults.filter((t) => !t.success).length;
+
+      // Attach PR to tasks via integration if configured
+      if (attachPrToTasks && integrationSecret) {
+        const prMetadata: PRMetadata = {
+          number: context.pr.number,
+          title: context.pr.title,
+          body: context.pr.body,
+          url: context.pr.url,
+        };
+
+        await attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret);
+      } else if (attachPrToTasks && !integrationSecret) {
+        core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
+      }
 
       // Post PR comments if configured
       if (commentTemplates.length > 0) {

@@ -26,4 +26,14 @@ export declare function fetchAllTaskDetails(taskGids: string[], asanaToken: stri
     name: string;
     url: string;
 }>>;
+/**
+ * Check if a PR is already linked to an Asana task
+ * Checks task attachments to see if the PR URL already exists
+ *
+ * @param taskGid - Task GID to check
+ * @param prUrl - PR URL to look for
+ * @param asanaToken - Asana API token
+ * @returns true if PR is already linked, false otherwise
+ */
+export declare function checkIfPRAlreadyLinked(taskGid: string, prUrl: string, asanaToken: string): Promise<boolean>;
 //# sourceMappingURL=tasks.d.ts.map

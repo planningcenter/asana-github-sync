@@ -66,6 +66,7 @@ export interface RuleExecutionResult {
     fieldUpdates: Map<string, string>;
     commentTemplates: string[];
     taskCreationSpecs: CreateTaskSpec[];
+    attachPrToTasks: boolean;
 }
 /**
  * Execute all matching rules and collect field updates

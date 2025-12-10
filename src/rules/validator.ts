@@ -101,6 +101,7 @@ function validateRule(rule: Rule, index: number): void {
   const hasUpdateFields = rule.then.update_fields && Object.keys(rule.then.update_fields).length > 0;
   const hasMarkComplete = !!rule.then.mark_complete;
   const hasPostComment = !!rule.then.post_pr_comment;
+  const hasAttachPr = !!rule.then.attach_pr_to_tasks;
 
   // Validate mutual exclusivity rules
   if (hasAsanaTasks === false) {
@@ -114,6 +115,9 @@ function validateRule(rule: Rule, index: number): void {
     if (hasMarkComplete) {
       throw new Error(`${prefix} has_asana_tasks: false cannot have mark_complete`);
     }
+    if (hasAttachPr) {
+      throw new Error(`${prefix} has_asana_tasks: false cannot have attach_pr_to_tasks`);
+    }
     // post_pr_comment is ALLOWED
 
     // Validate create_task structure
@@ -123,8 +127,8 @@ function validateRule(rule: Rule, index: number): void {
     if (hasCreateTask) {
       throw new Error(`${prefix} create_task requires has_asana_tasks: false`);
     }
-    if (!hasUpdateFields && !hasMarkComplete && !hasPostComment) {
-      throw new Error(`${prefix} must have at least one action (update_fields, mark_complete, or post_pr_comment)`);
+    if (!hasUpdateFields && !hasMarkComplete && !hasPostComment && !hasAttachPr) {
+      throw new Error(`${prefix} must have at least one action (update_fields, mark_complete, attach_pr_to_tasks, or post_pr_comment)`);
     }
   }
 
@@ -153,6 +157,10 @@ function validateRule(rule: Rule, index: number): void {
     if (rule.then.post_pr_comment.trim().length === 0) {
       throw new Error(`${prefix} 'post_pr_comment' cannot be empty`);
     }
+  }
+
+  if (rule.then.attach_pr_to_tasks !== undefined && typeof rule.then.attach_pr_to_tasks !== 'boolean') {
+    throw new Error(`${prefix} 'attach_pr_to_tasks' must be a boolean`);
   }
 }
 

@@ -31,6 +31,14 @@ export interface CreatedTaskResult {
  */
 export declare function createTask(spec: CreateTaskSpec, asanaToken: string, integrationSecret: string | undefined, prMetadata: PRMetadata): Promise<CreatedTaskResult>;
 /**
+ * Attach PR via Asana-GitHub integration for rich formatting
+ *
+ * @param taskUrl - Task URL to attach PR to
+ * @param prMetadata - PR metadata (number, title, body, url)
+ * @param integrationSecret - Integration secret
+ */
+export declare function attachPRViaIntegration(taskUrl: string, prMetadata: PRMetadata, integrationSecret: string): Promise<void>;
+/**
  * Create all tasks from specs
  * Handles failures gracefully per-task
  *
@@ -41,4 +49,19 @@ export declare function createTask(spec: CreateTaskSpec, asanaToken: string, int
  * @returns Array of creation results with success status
  */
 export declare function createAllTasks(specs: CreateTaskSpec[], asanaToken: string, integrationSecret: string | undefined, prMetadata: PRMetadata): Promise<CreatedTaskResult[]>;
+/**
+ * Attach PR to existing Asana tasks via integration
+ * Checks for existing links before attaching to avoid duplicates
+ *
+ * @param taskResults - Array of task results to attach PR to
+ * @param prMetadata - PR metadata for integration attachment
+ * @param asanaToken - Asana API token (for checking existing links)
+ * @param integrationSecret - Integration secret for attachment
+ */
+export declare function attachPRToExistingTasks(taskResults: Array<{
+    gid: string;
+    name: string;
+    url: string;
+    success: boolean;
+}>, prMetadata: PRMetadata, asanaToken: string, integrationSecret: string): Promise<void>;
 //# sourceMappingURL=create.d.ts.map

@@ -36,6 +36,7 @@ export interface Action {
     update_fields?: Record<string, string>;
     mark_complete?: boolean;
     post_pr_comment?: string;
+    attach_pr_to_tasks?: boolean;
 }
 /**
  * Complete rule definition

@@ -42907,8 +42907,8 @@ async function run() {
         core.info(`Event: ${context.eventName}, Action: ${context.action}`);
         core.info(`PR #${context.pr.number}: ${context.pr.title}`);
         core.info(`has_asana_tasks: ${hasAsanaTasks}`);
-        // Execute rules to get field updates, comment templates, and task creation specs
-        const { fieldUpdates, commentTemplates, taskCreationSpecs } = (0, engine_1.executeRules)(rules.rules, context);
+        // Execute rules to get field updates, comment templates, task creation specs, and attach flag
+        const { fieldUpdates, commentTemplates, taskCreationSpecs, attachPrToTasks } = (0, engine_1.executeRules)(rules.rules, context);
         // SPLIT EXECUTION PATH: Task creation vs. updates
         if (taskCreationSpecs.length > 0) {
             // PATH A: Task Creation Mode
@@ -42971,6 +42971,19 @@ async function run() {
             const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken);
             const successCount = taskResults.filter((t) => t.success).length;
             const failedCount = taskResults.filter((t) => !t.success).length;
+            // Attach PR to tasks via integration if configured
+            if (attachPrToTasks && integrationSecret) {
+                const prMetadata = {
+                    number: context.pr.number,
+                    title: context.pr.title,
+                    body: context.pr.body,
+                    url: context.pr.url,
+                };
+                await (0, asana_1.attachPRToExistingTasks)(taskResults, prMetadata, asanaToken, integrationSecret);
+            }
+            else if (attachPrToTasks && !integrationSecret) {
+                core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
+            }
             // Post PR comments if configured
             if (commentTemplates.length > 0) {
                 const prNumber = github.context.payload.pull_request?.number;
@@ -43185,6 +43198,7 @@ function executeRules(rules, context) {
     const commentTemplates = [];
     const taskCreationSpecs = [];
     let shouldMarkComplete = false;
+    let attachPrToTasks = false;
     for (const [index, rule] of rules.entries()) {
         if (!matchesCondition(rule.when, context)) {
             core.debug(`Rule ${index}: condition not met`);
@@ -43242,6 +43256,11 @@ function executeRules(rules, context) {
         if (rule.then.mark_complete) {
             shouldMarkComplete = true;
         }
+        // Aggregate attach_pr_to_tasks flag (any rule can set it)
+        if (rule.then.attach_pr_to_tasks) {
+            attachPrToTasks = true;
+            core.info(`  Will attach PR to existing Asana tasks`);
+        }
         // Collect comment template if present
         if (rule.then.post_pr_comment) {
             commentTemplates.push(rule.then.post_pr_comment);
@@ -43252,7 +43271,7 @@ function executeRules(rules, context) {
     if (shouldMarkComplete) {
         fieldUpdates.set('__mark_complete', 'true');
     }
-    return { fieldUpdates, commentTemplates, taskCreationSpecs };
+    return { fieldUpdates, commentTemplates, taskCreationSpecs, attachPrToTasks };
 }
 /**
  * Evaluate create_task action and build task creation specification
@@ -43443,6 +43462,7 @@ function validateRule(rule, index) {
     const hasUpdateFields = rule.then.update_fields && Object.keys(rule.then.update_fields).length > 0;
     const hasMarkComplete = !!rule.then.mark_complete;
     const hasPostComment = !!rule.then.post_pr_comment;
+    const hasAttachPr = !!rule.then.attach_pr_to_tasks;
     // Validate mutual exclusivity rules
     if (hasAsanaTasks === false) {
         // When has_asana_tasks: false - MUST create task, CANNOT update
@@ -43455,6 +43475,9 @@ function validateRule(rule, index) {
         if (hasMarkComplete) {
             throw new Error(`${prefix} has_asana_tasks: false cannot have mark_complete`);
         }
+        if (hasAttachPr) {
+            throw new Error(`${prefix} has_asana_tasks: false cannot have attach_pr_to_tasks`);
+        }
         // post_pr_comment is ALLOWED
         // Validate create_task structure
         validateCreateTaskAction(rule.then.create_task, index);
@@ -43464,8 +43487,8 @@ function validateRule(rule, index) {
         if (hasCreateTask) {
             throw new Error(`${prefix} create_task requires has_asana_tasks: false`);
         }
-        if (!hasUpdateFields && !hasMarkComplete && !hasPostComment) {
-            throw new Error(`${prefix} must have at least one action (update_fields, mark_complete, or post_pr_comment)`);
+        if (!hasUpdateFields && !hasMarkComplete && !hasPostComment && !hasAttachPr) {
+            throw new Error(`${prefix} must have at least one action (update_fields, mark_complete, attach_pr_to_tasks, or post_pr_comment)`);
         }
     }
     // Validate update_fields if present
@@ -43490,6 +43513,9 @@ function validateRule(rule, index) {
         if (rule.then.post_pr_comment.trim().length === 0) {
             throw new Error(`${prefix} 'post_pr_comment' cannot be empty`);
         }
+    }
+    if (rule.then.attach_pr_to_tasks !== undefined && typeof rule.then.attach_pr_to_tasks !== 'boolean') {
+        throw new Error(`${prefix} 'attach_pr_to_tasks' must be a boolean`);
     }
 }
 /**
@@ -43649,7 +43675,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createTask = createTask;
+exports.attachPRViaIntegration = attachPRViaIntegration;
 exports.createAllTasks = createAllTasks;
+exports.attachPRToExistingTasks = attachPRToExistingTasks;
 const core = __importStar(__nccwpck_require__(7484));
 const retry_1 = __nccwpck_require__(4266);
 const client_1 = __nccwpck_require__(1382);
@@ -43843,6 +43871,37 @@ async function createAllTasks(specs, asanaToken, integrationSecret, prMetadata) 
     }
     return results;
 }
+/**
+ * Attach PR to existing Asana tasks via integration
+ * Checks for existing links before attaching to avoid duplicates
+ *
+ * @param taskResults - Array of task results to attach PR to
+ * @param prMetadata - PR metadata for integration attachment
+ * @param asanaToken - Asana API token (for checking existing links)
+ * @param integrationSecret - Integration secret for attachment
+ */
+async function attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret) {
+    const { checkIfPRAlreadyLinked } = await Promise.resolve().then(() => __importStar(__nccwpck_require__(5067)));
+    core.info('Attaching PR to existing Asana tasks...');
+    for (const taskResult of taskResults) {
+        if (!taskResult.success) {
+            continue; // Skip failed tasks
+        }
+        try {
+            // Check if PR is already linked
+            const alreadyLinked = await checkIfPRAlreadyLinked(taskResult.gid, prMetadata.url, asanaToken);
+            if (!alreadyLinked) {
+                await attachPRViaIntegration(taskResult.url, prMetadata, integrationSecret);
+                core.info(`✓ Attached PR to task ${taskResult.gid}`);
+            }
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to attach PR to task ${taskResult.gid}: ${errorMessage}`);
+            // Continue with other tasks
+        }
+    }
+}
 
 
 /***/ }),
@@ -44020,7 +44079,7 @@ function coerceFieldValue(schema, rawValue, fieldGid) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createAllTasks = exports.createTask = exports.updateTaskFields = exports.updateAllTasks = exports.fetchAllTaskDetails = exports.fetchTaskDetails = exports.coerceFieldValue = exports.getFieldSchema = exports.fetchCustomField = exports.clearFieldSchemaCache = exports.asanaRequest = exports.ASANA_API_BASE = void 0;
+exports.attachPRToExistingTasks = exports.attachPRViaIntegration = exports.createAllTasks = exports.createTask = exports.updateTaskFields = exports.updateAllTasks = exports.checkIfPRAlreadyLinked = exports.fetchAllTaskDetails = exports.fetchTaskDetails = exports.coerceFieldValue = exports.getFieldSchema = exports.fetchCustomField = exports.clearFieldSchemaCache = exports.asanaRequest = exports.ASANA_API_BASE = void 0;
 var client_1 = __nccwpck_require__(1382);
 Object.defineProperty(exports, "ASANA_API_BASE", ({ enumerable: true, get: function () { return client_1.ASANA_API_BASE; } }));
 Object.defineProperty(exports, "asanaRequest", ({ enumerable: true, get: function () { return client_1.asanaRequest; } }));
@@ -44032,12 +44091,15 @@ Object.defineProperty(exports, "coerceFieldValue", ({ enumerable: true, get: fun
 var tasks_1 = __nccwpck_require__(5067);
 Object.defineProperty(exports, "fetchTaskDetails", ({ enumerable: true, get: function () { return tasks_1.fetchTaskDetails; } }));
 Object.defineProperty(exports, "fetchAllTaskDetails", ({ enumerable: true, get: function () { return tasks_1.fetchAllTaskDetails; } }));
+Object.defineProperty(exports, "checkIfPRAlreadyLinked", ({ enumerable: true, get: function () { return tasks_1.checkIfPRAlreadyLinked; } }));
 var update_1 = __nccwpck_require__(8520);
 Object.defineProperty(exports, "updateAllTasks", ({ enumerable: true, get: function () { return update_1.updateAllTasks; } }));
 Object.defineProperty(exports, "updateTaskFields", ({ enumerable: true, get: function () { return update_1.updateTaskFields; } }));
 var create_1 = __nccwpck_require__(293);
 Object.defineProperty(exports, "createTask", ({ enumerable: true, get: function () { return create_1.createTask; } }));
 Object.defineProperty(exports, "createAllTasks", ({ enumerable: true, get: function () { return create_1.createAllTasks; } }));
+Object.defineProperty(exports, "attachPRViaIntegration", ({ enumerable: true, get: function () { return create_1.attachPRViaIntegration; } }));
+Object.defineProperty(exports, "attachPRToExistingTasks", ({ enumerable: true, get: function () { return create_1.attachPRToExistingTasks; } }));
 
 
 /***/ }),
@@ -44086,6 +44148,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.fetchTaskDetails = fetchTaskDetails;
 exports.fetchAllTaskDetails = fetchAllTaskDetails;
+exports.checkIfPRAlreadyLinked = checkIfPRAlreadyLinked;
 const core = __importStar(__nccwpck_require__(7484));
 const retry_1 = __nccwpck_require__(4266);
 const client_1 = __nccwpck_require__(1382);
@@ -44134,6 +44197,46 @@ async function fetchAllTaskDetails(taskGids, asanaToken) {
         }
     }
     return results;
+}
+/**
+ * Check if a PR is already linked to an Asana task
+ * Checks task attachments to see if the PR URL already exists
+ *
+ * @param taskGid - Task GID to check
+ * @param prUrl - PR URL to look for
+ * @param asanaToken - Asana API token
+ * @returns true if PR is already linked, false otherwise
+ */
+async function checkIfPRAlreadyLinked(taskGid, prUrl, asanaToken) {
+    try {
+        core.debug(`Checking if PR ${prUrl} is already linked to task ${taskGid}...`);
+        const attachments = await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/attachments?parent=${taskGid}&opt_fields=gid,name,resource_subtype,view_url`), `check attachments for task ${taskGid}`);
+        // Check if any attachment's view_url or name contains the PR URL
+        const isLinked = attachments.some((attachment) => {
+            // Check view_url if available
+            if (attachment.view_url && attachment.view_url === prUrl) {
+                return true;
+            }
+            // Also check name as some attachments store URL in name
+            if (attachment.name && attachment.name.includes(prUrl)) {
+                return true;
+            }
+            return false;
+        });
+        if (isLinked) {
+            core.info(`✓ PR already linked to task ${taskGid}, skipping`);
+        }
+        else {
+            core.debug(`PR not yet linked to task ${taskGid}`);
+        }
+        return isLinked;
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.warning(`Failed to check existing links for task ${taskGid}: ${errorMessage}`);
+        // On error, return false to proceed with attachment (fail open)
+        return false;
+    }
 }
 
 
