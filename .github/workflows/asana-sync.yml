@@ -16,8 +16,30 @@ jobs:
         with:
           asana_token: ${{ secrets.ASANA_TOKEN }}
           github_token: ${{ github.token }}
+          integration_secret: ${{ secrets.ASANA_INTEGRATION_SECRET }}
           rules: |
             rules:
+              # Create Asana task when PR opened without existing task link
+              - when:
+                  event: pull_request
+                  action: opened
+                  has_asana_tasks: false
+                then:
+                  create_task:
+                    project: '1212291850390910'
+                    workspace: '1202585680506197'
+                    title: '{{clean_title pr.title}}'
+                    html_notes: |
+                      <body>
+                      <strong>PR:</strong> <a href="{{pr.url}}">{{pr.title}}</a>
+                      <hr />
+                      {{sanitize_markdown pr.body}}
+                      </body>
+                    initial_fields:
+                      '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
+                    remove_followers: ['me']
+
+              # Update existing task when PR opened
               - when:
                   event: pull_request
                   action: opened
