@@ -44177,6 +44177,9 @@ async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
     const results = [];
     for (let i = 0; i < taskIds.length; i++) {
         const taskId = taskIds[i];
+        if (!taskId) {
+            continue;
+        }
         const details = taskDetails[i] || {
             gid: taskId,
             name: `Task ${taskId}`,
@@ -44639,7 +44642,10 @@ const extractIds = (text) => {
         const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(?:project\/\d+\/task\/)?(\d+)/g;
         let match;
         while ((match = regex.exec(text)) !== null) {
-            taskIds.add(match[1]);
+            const taskId = match[1];
+            if (taskId) {
+                taskIds.add(taskId);
+            }
         }
     }
     return taskIds;

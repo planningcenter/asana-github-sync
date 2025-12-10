@@ -3,7 +3,7 @@
  */
 
 import * as core from '@actions/core';
-import * as github from '@actions/github';
+import type * as github from '@actions/github';
 import type { Rule, Condition, CreateTaskAction } from './types';
 import { evaluateTemplate } from '../expression/evaluator';
 import type { HandlebarsContext, CommentContext } from '../expression/context';

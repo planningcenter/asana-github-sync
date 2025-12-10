@@ -18,8 +18,20 @@ module.exports = [
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/explicit-function-return-type': 'off',
+
+      // Coding Standards Enforcement
+      '@typescript-eslint/no-explicit-any': 'error', // No any types
+      '@typescript-eslint/consistent-type-assertions': ['error', {
+        assertionStyle: 'never' // No type casting (as X)
+      }],
+      '@typescript-eslint/consistent-type-imports': ['error', {
+        prefer: 'type-imports', // Use import type for type-only imports
+        fixStyle: 'separate-type-imports'
+      }],
+      'semi': ['error', 'always'], // Always require semicolons
+
+      // Additional best practices
+      '@typescript-eslint/explicit-function-return-type': 'off', // Allow type inference
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-console': 'off' // GitHub Actions uses console for logging
     }
@@ -40,7 +52,18 @@ module.exports = [
     rules: {
       ...tsPlugin.configs.recommended.rules,
       ...jestPlugin.configs.recommended.rules,
-      '@typescript-eslint/no-explicit-any': 'warn',
+
+      // Coding Standards Enforcement (same as src, but allow some flexibility in tests)
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-assertions': ['error', {
+        assertionStyle: 'never'
+      }],
+      '@typescript-eslint/consistent-type-imports': ['error', {
+        prefer: 'type-imports',
+        fixStyle: 'separate-type-imports'
+      }],
+      'semi': ['error', 'always'],
+
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
     }

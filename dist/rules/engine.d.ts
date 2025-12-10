@@ -1,7 +1,7 @@
 /**
  * Rules engine - condition matching and execution
  */
-import * as github from '@actions/github';
+import type * as github from '@actions/github';
 import type { Rule, Condition, CreateTaskAction } from './types';
 import type { CommentContext } from '../expression/context';
 /**

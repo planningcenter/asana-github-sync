@@ -38,6 +38,10 @@ export async function updateAllTasks(
 
   for (let i = 0; i < taskIds.length; i++) {
     const taskId = taskIds[i];
+    if (!taskId) {
+      continue;
+    }
+
     const details = taskDetails[i] || {
       gid: taskId,
       name: `Task ${taskId}`,

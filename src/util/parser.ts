@@ -13,7 +13,10 @@ const extractIds = (text: string | undefined) => {
     let match: RegExpExecArray | null;
 
     while ((match = regex.exec(text)) !== null) {
-      taskIds.add(match[1]);
+      const taskId = match[1];
+      if (taskId) {
+        taskIds.add(taskId);
+      }
     }
   }
 
