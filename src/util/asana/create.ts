@@ -119,7 +119,7 @@ export async function createTask(
   // Always attach PR via integration if secret is provided
   if (integrationSecret) {
     try {
-      await attachPRViaIntegration(taskGid, prUrl, integrationSecret, asanaToken);
+      await attachPRViaIntegration(taskUrl, prUrl, integrationSecret);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       core.warning(`Failed to attach PR via integration: ${errorMessage}`);
@@ -162,53 +162,52 @@ async function removeTaskFollowers(taskGid: string, followers: string[], asanaTo
 /**
  * Attach PR via Asana-GitHub integration for rich formatting
  *
- * @param taskGid - Task GID to attach PR to
+ * @param taskUrl - Task URL to attach PR to
  * @param prUrl - GitHub PR URL
  * @param integrationSecret - Integration secret
- * @param asanaToken - Asana API token
  */
 async function attachPRViaIntegration(
-  taskGid: string,
+  taskUrl: string,
   prUrl: string,
   integrationSecret: string,
-  asanaToken: string
 ): Promise<void> {
-  core.info(`Attaching PR ${prUrl} to task ${taskGid} via integration...`);
+  core.info(`Attaching PR ${prUrl} to task via integration...`);
 
-  // Extract domain from PR URL
-  const domain = new URL(prUrl).hostname; // e.g., "github.com"
-
-  const attachmentData = {
-    resource_url: prUrl,
-    secret: integrationSecret,
+  // Since we don't have full PR metadata in this context, we'll send minimal payload
+  // The integration will fetch full PR details from GitHub
+  const payload = {
+    pullRequestURL: prUrl,
   };
 
-  // Use AbortController for 30s timeout (matches script 2 behavior)
+  // Use AbortController for 30s timeout
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch(`https://app.asana.com/api/1.0/external/${domain}/attachments`, {
+    const response = await fetch('https://github.integrations.asana.plus/custom/v1/actions/widget', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${asanaToken}`,
+        'Authorization': `Bearer ${integrationSecret}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        data: {
-          resource: taskGid,
-          ...attachmentData,
-        },
-      }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Integration API error: ${response.status} ${response.statusText}: ${errorBody}`);
-    }
+    const responseText = await response.text();
 
-    core.info(`✓ PR attached via integration`);
+    if (response.ok) {
+      core.info('✓ PR attached via integration');
+    } else {
+      core.warning(`⚠️ Integration attachment failed with status ${response.status}: ${responseText}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      core.warning('⏱️ Integration attachment timed out after 30 seconds, but task was created successfully');
+    } else {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.warning(`❌ Integration attachment failed: ${errorMessage}, but task was created successfully`);
+    }
   } finally {
     clearTimeout(timeout);
   }
