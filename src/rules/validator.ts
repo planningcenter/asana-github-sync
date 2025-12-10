@@ -66,6 +66,16 @@ function validateRule(rule: Rule, index: number): void {
     throw new Error(`${prefix} 'label' must be a string`);
   }
 
+  // Validate has_labels field
+  if (rule.when.has_labels !== undefined) {
+    if (typeof rule.when.has_labels !== 'string' && !Array.isArray(rule.when.has_labels)) {
+      throw new Error(`${prefix} 'has_labels' must be a string or array`);
+    }
+    if (Array.isArray(rule.when.has_labels) && rule.when.has_labels.length === 0) {
+      throw new Error(`${prefix} 'has_labels' array cannot be empty`);
+    }
+  }
+
   if (rule.when.has_asana_tasks !== undefined && typeof rule.when.has_asana_tasks !== 'boolean') {
     throw new Error(`${prefix} 'has_asana_tasks' must be a boolean`);
   }

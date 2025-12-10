@@ -11,6 +11,7 @@ export interface Condition {
     merged?: boolean;
     draft?: boolean;
     label?: string;
+    has_labels?: string | string[];
     has_asana_tasks?: boolean;
     author?: string | string[];
 }

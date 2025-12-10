@@ -43102,6 +43102,10 @@ function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) 
             name: payload.label.name,
         };
     }
+    // Extract all label names from PR (if present)
+    if (pr.labels && Array.isArray(pr.labels)) {
+        context.labels = pr.labels.map((label) => label.name);
+    }
     if (comments !== undefined) {
         context.comments = comments;
     }
@@ -43140,6 +43144,17 @@ function matchesCondition(condition, context) {
     // Label (if specified) must match
     if (condition.label !== undefined) {
         if (!context.label || condition.label !== context.label.name) {
+            return false;
+        }
+    }
+    // has_labels (if specified) - PR must have at least one of the specified labels
+    if (condition.has_labels !== undefined) {
+        const requiredLabels = Array.isArray(condition.has_labels)
+            ? condition.has_labels
+            : [condition.has_labels];
+        const prLabels = context.labels || [];
+        const hasMatch = requiredLabels.some((label) => prLabels.includes(label));
+        if (!hasMatch) {
             return false;
         }
     }
@@ -43396,6 +43411,15 @@ function validateRule(rule, index) {
     }
     if (rule.when.label !== undefined && typeof rule.when.label !== 'string') {
         throw new Error(`${prefix} 'label' must be a string`);
+    }
+    // Validate has_labels field
+    if (rule.when.has_labels !== undefined) {
+        if (typeof rule.when.has_labels !== 'string' && !Array.isArray(rule.when.has_labels)) {
+            throw new Error(`${prefix} 'has_labels' must be a string or array`);
+        }
+        if (Array.isArray(rule.when.has_labels) && rule.when.has_labels.length === 0) {
+            throw new Error(`${prefix} 'has_labels' array cannot be empty`);
+        }
     }
     if (rule.when.has_asana_tasks !== undefined && typeof rule.when.has_asana_tasks !== 'boolean') {
         throw new Error(`${prefix} 'has_asana_tasks' must be a boolean`);

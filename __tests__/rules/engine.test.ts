@@ -35,6 +35,7 @@ describe('matchesCondition', () => {
         head_ref: 'feature',
         url: 'https://github.com/owner/repo/pull/123',
       },
+      hasAsanaTasks: true,
     };
   });
 
@@ -117,6 +118,47 @@ describe('matchesCondition', () => {
     expect(matchesCondition(condition, baseContext)).toBe(false);
   });
 
+  test('matches when has_labels condition matches (single string)', () => {
+    baseContext.labels = ['bug', 'feature'];
+    const condition: Condition = { event: 'pull_request', has_labels: 'bug' };
+    expect(matchesCondition(condition, baseContext)).toBe(true);
+  });
+
+  test('does not match when has_labels differs (single string)', () => {
+    baseContext.labels = ['feature', 'enhancement'];
+    const condition: Condition = { event: 'pull_request', has_labels: 'bug' };
+    expect(matchesCondition(condition, baseContext)).toBe(false);
+  });
+
+  test('matches when has_labels condition matches (array - one match)', () => {
+    baseContext.labels = ['bug', 'feature'];
+    const condition: Condition = { event: 'pull_request', has_labels: ['bug', 'hotfix'] };
+    expect(matchesCondition(condition, baseContext)).toBe(true);
+  });
+
+  test('matches when has_labels condition matches (array - multiple matches)', () => {
+    baseContext.labels = ['bug', 'feature', 'hotfix'];
+    const condition: Condition = { event: 'pull_request', has_labels: ['bug', 'hotfix'] };
+    expect(matchesCondition(condition, baseContext)).toBe(true);
+  });
+
+  test('does not match when has_labels differs (array - no matches)', () => {
+    baseContext.labels = ['feature', 'enhancement'];
+    const condition: Condition = { event: 'pull_request', has_labels: ['bug', 'hotfix'] };
+    expect(matchesCondition(condition, baseContext)).toBe(false);
+  });
+
+  test('does not match when has_labels but PR has no labels', () => {
+    const condition: Condition = { event: 'pull_request', has_labels: 'bug' };
+    expect(matchesCondition(condition, baseContext)).toBe(false);
+  });
+
+  test('does not match when has_labels but PR labels is empty array', () => {
+    baseContext.labels = [];
+    const condition: Condition = { event: 'pull_request', has_labels: 'bug' };
+    expect(matchesCondition(condition, baseContext)).toBe(false);
+  });
+
   test('matches complex condition with all fields', () => {
     const condition: Condition = {
       event: 'pull_request',
@@ -161,6 +203,7 @@ describe('executeRules', () => {
         head_ref: 'feature',
         url: 'https://github.com/owner/repo/pull/123',
       },
+      hasAsanaTasks: true,
     };
   });
 
@@ -279,7 +322,8 @@ describe('executeRules', () => {
 
     const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(fieldUpdates.get('1234')).toBe('');
+    // Empty values are skipped, so the field won't be in the map
+    expect(fieldUpdates.get('1234')).toBeUndefined();
     expect(core.error).toHaveBeenCalled(); // Error logged from evaluator
   });
 

@@ -11,7 +11,8 @@ export interface Condition {
   action?: string | string[]; // Optional: Event action(s) (e.g., 'opened', ['opened', 'reopened'])
   merged?: boolean; // Optional: PR merged status
   draft?: boolean; // Optional: PR draft status
-  label?: string; // Optional: Exact label name match
+  label?: string; // Optional: Exact label name match (from labeled event)
+  has_labels?: string | string[]; // Optional: PR must have any of these labels (current state)
   has_asana_tasks?: boolean; // Optional: Whether PR has Asana task links (default: true)
   author?: string | string[]; // Optional: PR author username(s)
 }

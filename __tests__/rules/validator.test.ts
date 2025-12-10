@@ -177,7 +177,9 @@ describe('validateRulesConfig', () => {
       ],
     } as unknown as RulesConfig;
 
-    expect(() => validateRulesConfig(config)).toThrow("Rule 0: 'update_fields' must be an object");
+    expect(() => validateRulesConfig(config)).toThrow(
+      "Rule 0: must have at least one action (update_fields, mark_complete, or post_pr_comment)"
+    );
   });
 
   test('throws when update_fields is not an object', () => {
@@ -203,7 +205,9 @@ describe('validateRulesConfig', () => {
       ],
     };
 
-    expect(() => validateRulesConfig(config)).toThrow("Rule 0: 'update_fields' cannot be empty");
+    expect(() => validateRulesConfig(config)).toThrow(
+      "Rule 0: must have at least one action (update_fields, mark_complete, or post_pr_comment)"
+    );
   });
 
   test('throws when field GID is not numeric', () => {
@@ -278,6 +282,8 @@ describe('validateRulesConfig', () => {
       ],
     } as unknown as RulesConfig;
 
-    expect(() => validateRulesConfig(config)).toThrow("Rule 1: 'update_fields' cannot be empty");
+    expect(() => validateRulesConfig(config)).toThrow(
+      "Rule 1: must have at least one action (update_fields, mark_complete, or post_pr_comment)"
+    );
   });
 });
