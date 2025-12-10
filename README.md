@@ -2,6 +2,8 @@
 
 A GitHub Action that syncs GitHub pull requests to Asana tasks using flexible, rule-based automation.
 
+📚 **[View Full Documentation →](https://planningcenter.github.io/asana-github-sync/)**
+
 ## Features
 
 - **Rule-based automation**: Define custom rules for different PR events (opened, closed, edited, etc.)
@@ -37,23 +39,37 @@ jobs:
                     '1234567890': 'In Review'
 ```
 
-## Inputs
+## Documentation
+
+- **[Getting Started](https://planningcenter.github.io/asana-github-sync/guide/)** - Installation and setup
+- **[Examples](https://planningcenter.github.io/asana-github-sync/examples/basic-status-update)** - Real-world workflows
+- **[Conditions](https://planningcenter.github.io/asana-github-sync/reference/conditions/)** - When rules trigger
+- **[Actions](https://planningcenter.github.io/asana-github-sync/reference/actions/)** - What rules do
+- **[Templates](https://planningcenter.github.io/asana-github-sync/concepts/templates)** - Dynamic values with Handlebars
+
+## Quick Reference
+
+### Inputs
 
 | Input | Required | Description |
 |-------|----------|-------------|
 | `asana_token` | Yes | Asana Personal Access Token |
 | `github_token` | Yes | GitHub token (use `secrets.GITHUB_TOKEN`) |
-| `rules` | Yes | YAML rules configuration for PR event automation |
-| `user_mappings` | No | JSON mapping GitHub usernames to Asana user GIDs |
-| `integration_secret` | No | Asana-GitHub integration secret for rich PR attachments |
+| `rules` | Yes | YAML rules configuration |
+| `user_mappings` | No | Map GitHub usernames to Asana user GIDs |
+| `integration_secret` | No | Asana-GitHub integration secret |
 
-## Outputs
+[Complete input documentation →](https://planningcenter.github.io/asana-github-sync/reference/inputs-outputs)
+
+### Outputs
 
 | Output | Description |
 |--------|-------------|
-| `task_ids` | Comma-separated list of task IDs found or created |
+| `task_ids` | Comma-separated list of task IDs |
 | `field_updates` | Number of field updates applied |
 | `tasks_created` | Number of tasks created |
+
+[Complete output documentation →](https://planningcenter.github.io/asana-github-sync/reference/inputs-outputs)
 
 ## License
 
