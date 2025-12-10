@@ -10,6 +10,16 @@ import { getFieldSchema, coerceFieldValue } from './fields';
 import { CreateTaskSpec } from '../../rules/engine';
 
 /**
+ * PR metadata for integration attachment
+ */
+export interface PRMetadata {
+  number: number;
+  title: string;
+  body: string;
+  url: string;
+}
+
+/**
  * Task creation result (includes success status)
  */
 export interface CreatedTaskResult {
@@ -25,14 +35,14 @@ export interface CreatedTaskResult {
  * @param spec - Task creation specification from rules engine
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret for rich PR attachment
- * @param prUrl - PR URL for integration attachment
+ * @param prMetadata - PR metadata for integration attachment
  * @returns Created task result
  */
 export async function createTask(
   spec: CreateTaskSpec,
   asanaToken: string,
   integrationSecret: string | undefined,
-  prUrl: string
+  prMetadata: PRMetadata
 ): Promise<CreatedTaskResult> {
   const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } =
     spec;
@@ -119,7 +129,7 @@ export async function createTask(
   // Always attach PR via integration if secret is provided
   if (integrationSecret) {
     try {
-      await attachPRViaIntegration(taskUrl, prUrl, integrationSecret);
+      await attachPRViaIntegration(taskUrl, prMetadata, integrationSecret);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       core.warning(`Failed to attach PR via integration: ${errorMessage}`);
@@ -163,20 +173,24 @@ async function removeTaskFollowers(taskGid: string, followers: string[], asanaTo
  * Attach PR via Asana-GitHub integration for rich formatting
  *
  * @param taskUrl - Task URL to attach PR to
- * @param prUrl - GitHub PR URL
+ * @param prMetadata - PR metadata (number, title, body, url)
  * @param integrationSecret - Integration secret
  */
 async function attachPRViaIntegration(
   taskUrl: string,
-  prUrl: string,
+  prMetadata: PRMetadata,
   integrationSecret: string,
 ): Promise<void> {
-  core.info(`Attaching PR ${prUrl} to task via integration...`);
+  core.info(`Attaching PR ${prMetadata.url} to task via integration...`);
 
-  // Since we don't have full PR metadata in this context, we'll send minimal payload
-  // The integration will fetch full PR details from GitHub
+  // Build full PR description including task link (matching reference implementation)
+  const prDescription = `${prMetadata.body || ''}\n\n---\n\nAsana task: [${taskUrl}](${taskUrl})`;
+
   const payload = {
-    pullRequestURL: prUrl,
+    pullRequestDescription: prDescription,
+    pullRequestName: prMetadata.title,
+    pullRequestNumber: prMetadata.number,
+    pullRequestURL: prMetadata.url,
   };
 
   // Use AbortController for 30s timeout
@@ -220,20 +234,20 @@ async function attachPRViaIntegration(
  * @param specs - Array of task creation specifications
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret
- * @param prUrl - PR URL for integration attachment
+ * @param prMetadata - PR metadata for integration attachment
  * @returns Array of creation results with success status
  */
 export async function createAllTasks(
   specs: CreateTaskSpec[],
   asanaToken: string,
   integrationSecret: string | undefined,
-  prUrl: string
+  prMetadata: PRMetadata
 ): Promise<CreatedTaskResult[]> {
   const results: CreatedTaskResult[] = [];
 
   for (const spec of specs) {
     try {
-      const result = await createTask(spec, asanaToken, integrationSecret, prUrl);
+      const result = await createTask(spec, asanaToken, integrationSecret, prMetadata);
       results.push(result);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

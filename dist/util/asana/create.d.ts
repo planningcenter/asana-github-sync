@@ -3,6 +3,15 @@
  */
 import { CreateTaskSpec } from '../../rules/engine';
 /**
+ * PR metadata for integration attachment
+ */
+export interface PRMetadata {
+    number: number;
+    title: string;
+    body: string;
+    url: string;
+}
+/**
  * Task creation result (includes success status)
  */
 export interface CreatedTaskResult {
@@ -17,10 +26,10 @@ export interface CreatedTaskResult {
  * @param spec - Task creation specification from rules engine
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret for rich PR attachment
- * @param prUrl - PR URL for integration attachment
+ * @param prMetadata - PR metadata for integration attachment
  * @returns Created task result
  */
-export declare function createTask(spec: CreateTaskSpec, asanaToken: string, integrationSecret: string | undefined, prUrl: string): Promise<CreatedTaskResult>;
+export declare function createTask(spec: CreateTaskSpec, asanaToken: string, integrationSecret: string | undefined, prMetadata: PRMetadata): Promise<CreatedTaskResult>;
 /**
  * Create all tasks from specs
  * Handles failures gracefully per-task
@@ -28,8 +37,8 @@ export declare function createTask(spec: CreateTaskSpec, asanaToken: string, int
  * @param specs - Array of task creation specifications
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret
- * @param prUrl - PR URL for integration attachment
+ * @param prMetadata - PR metadata for integration attachment
  * @returns Array of creation results with success status
  */
-export declare function createAllTasks(specs: CreateTaskSpec[], asanaToken: string, integrationSecret: string | undefined, prUrl: string): Promise<CreatedTaskResult[]>;
+export declare function createAllTasks(specs: CreateTaskSpec[], asanaToken: string, integrationSecret: string | undefined, prMetadata: PRMetadata): Promise<CreatedTaskResult[]>;
 //# sourceMappingURL=create.d.ts.map

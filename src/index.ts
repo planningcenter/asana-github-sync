@@ -93,7 +93,12 @@ async function run(): Promise<void> {
         taskCreationSpecs,
         asanaToken,
         integrationSecret,
-        context.pr.url
+        {
+          number: context.pr.number,
+          title: context.pr.title,
+          body: context.pr.body,
+          url: context.pr.url,
+        }
       );
 
       const successCount = createdTasks.filter((t) => t.success).length;

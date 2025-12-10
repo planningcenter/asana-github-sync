@@ -42909,7 +42909,12 @@ async function run() {
                 core.error('No PR number found in payload, cannot create tasks');
                 return;
             }
-            const createdTasks = await (0, asana_1.createAllTasks)(taskCreationSpecs, asanaToken, integrationSecret, context.pr.url);
+            const createdTasks = await (0, asana_1.createAllTasks)(taskCreationSpecs, asanaToken, integrationSecret, {
+                number: context.pr.number,
+                title: context.pr.title,
+                body: context.pr.body,
+                url: context.pr.url,
+            });
             const successCount = createdTasks.filter((t) => t.success).length;
             const failedCount = createdTasks.filter((t) => !t.success).length;
             // Update PR body with task links
@@ -43628,10 +43633,10 @@ const fields_1 = __nccwpck_require__(836);
  * @param spec - Task creation specification from rules engine
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret for rich PR attachment
- * @param prUrl - PR URL for integration attachment
+ * @param prMetadata - PR metadata for integration attachment
  * @returns Created task result
  */
-async function createTask(spec, asanaToken, integrationSecret, prUrl) {
+async function createTask(spec, asanaToken, integrationSecret, prMetadata) {
     const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } = spec;
     core.info(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
     // Build task data
@@ -43700,7 +43705,7 @@ async function createTask(spec, asanaToken, integrationSecret, prUrl) {
     // Always attach PR via integration if secret is provided
     if (integrationSecret) {
         try {
-            await attachPRViaIntegration(taskGid, prUrl, integrationSecret, asanaToken);
+            await attachPRViaIntegration(taskUrl, prMetadata, integrationSecret);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -43735,42 +43740,49 @@ async function removeTaskFollowers(taskGid, followers, asanaToken) {
 /**
  * Attach PR via Asana-GitHub integration for rich formatting
  *
- * @param taskGid - Task GID to attach PR to
- * @param prUrl - GitHub PR URL
+ * @param taskUrl - Task URL to attach PR to
+ * @param prMetadata - PR metadata (number, title, body, url)
  * @param integrationSecret - Integration secret
- * @param asanaToken - Asana API token
  */
-async function attachPRViaIntegration(taskGid, prUrl, integrationSecret, asanaToken) {
-    core.info(`Attaching PR ${prUrl} to task ${taskGid} via integration...`);
-    // Extract domain from PR URL
-    const domain = new URL(prUrl).hostname; // e.g., "github.com"
-    const attachmentData = {
-        resource_url: prUrl,
-        secret: integrationSecret,
+async function attachPRViaIntegration(taskUrl, prMetadata, integrationSecret) {
+    core.info(`Attaching PR ${prMetadata.url} to task via integration...`);
+    // Build full PR description including task link (matching reference implementation)
+    const prDescription = `${prMetadata.body || ''}\n\n---\n\nAsana task: [${taskUrl}](${taskUrl})`;
+    const payload = {
+        pullRequestDescription: prDescription,
+        pullRequestName: prMetadata.title,
+        pullRequestNumber: prMetadata.number,
+        pullRequestURL: prMetadata.url,
     };
-    // Use AbortController for 30s timeout (matches script 2 behavior)
+    // Use AbortController for 30s timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
-        const response = await fetch(`https://app.asana.com/api/1.0/external/${domain}/attachments`, {
+        const response = await fetch('https://github.integrations.asana.plus/custom/v1/actions/widget', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${asanaToken}`,
+                'Authorization': `Bearer ${integrationSecret}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: {
-                    resource: taskGid,
-                    ...attachmentData,
-                },
-            }),
+            body: JSON.stringify(payload),
             signal: controller.signal,
         });
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`Integration API error: ${response.status} ${response.statusText}: ${errorBody}`);
+        const responseText = await response.text();
+        if (response.ok) {
+            core.info('✓ PR attached via integration');
         }
-        core.info(`✓ PR attached via integration`);
+        else {
+            core.warning(`⚠️ Integration attachment failed with status ${response.status}: ${responseText}`);
+        }
+    }
+    catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            core.warning('⏱️ Integration attachment timed out after 30 seconds, but task was created successfully');
+        }
+        else {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`❌ Integration attachment failed: ${errorMessage}, but task was created successfully`);
+        }
     }
     finally {
         clearTimeout(timeout);
@@ -43783,14 +43795,14 @@ async function attachPRViaIntegration(taskGid, prUrl, integrationSecret, asanaTo
  * @param specs - Array of task creation specifications
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret
- * @param prUrl - PR URL for integration attachment
+ * @param prMetadata - PR metadata for integration attachment
  * @returns Array of creation results with success status
  */
-async function createAllTasks(specs, asanaToken, integrationSecret, prUrl) {
+async function createAllTasks(specs, asanaToken, integrationSecret, prMetadata) {
     const results = [];
     for (const spec of specs) {
         try {
-            const result = await createTask(spec, asanaToken, integrationSecret, prUrl);
+            const result = await createTask(spec, asanaToken, integrationSecret, prMetadata);
             results.push(result);
         }
         catch (error) {
