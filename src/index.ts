@@ -12,7 +12,7 @@ import { extractAsanaTaskIds } from './util/parser';
 import { fetchAllTaskDetails, updateAllTasks } from './util/asana';
 import { registerHelpers } from './expression/helpers';
 import { rulesUseHelper } from './util/template-analysis';
-import { fetchPRComments, postCommentTemplates } from './util/github';
+import { fetchPRComments, postCommentTemplates, postMissingAsanaUrlPrompt } from './util/github';
 import { evaluateTemplate } from './expression/evaluator';
 
 /**
@@ -66,7 +66,16 @@ async function run(): Promise<void> {
     const { taskIds } = extractAsanaTaskIds(context.pr.body);
 
     if (taskIds.length === 0) {
-      core.info('No Asana task links found in PR body, skipping');
+      core.info('No Asana task links found in PR body');
+
+      // Post comment asking for Asana URL if configured
+      if (rules.comment_on_pr_when_asana_url_missing) {
+        const prNumber = github.context.payload.pull_request?.number;
+        if (prNumber) {
+          await postMissingAsanaUrlPrompt(githubToken, prNumber);
+        }
+      }
+
       return;
     }
 

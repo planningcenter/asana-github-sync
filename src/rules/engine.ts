@@ -162,6 +162,14 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
       try {
         const value = evaluateTemplate(template, handlebarsContext);
 
+        // Skip empty values - usually means extraction found nothing
+        // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
+        // TODO(docs): Document this behavior - fields with empty template results are skipped
+        if (value === '') {
+          core.info(`  Field ${fieldGid} skipped (empty value)`);
+          continue;
+        }
+
         // Last rule wins for conflicting fields
         fieldUpdates.set(fieldGid, value);
         core.info(`  Field ${fieldGid} = "${value}"`);
@@ -214,6 +222,7 @@ export function buildCommentContext(
       name: ruleContext.eventName,
       action: ruleContext.action,
     },
+    comments: ruleContext.comments,
     tasks: taskResults,
     updates: {
       fields: Array.from(fieldUpdates.entries())

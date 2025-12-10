@@ -67,7 +67,44 @@ export async function postPRComment(
 }
 
 /**
- * Evaluate and post multiple comment templates to a PR
+ * Post a comment prompting for Asana URL if not already posted
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ */
+export async function postMissingAsanaUrlPrompt(
+  githubToken: string,
+  prNumber: number
+): Promise<void> {
+  const promptText = 'Please add the Asana task URL to this PR description so the workflow can update the Asana custom fields.\n\nExample:\n- https://app.asana.com/0/<project_id>/<task_id>';
+
+  try {
+    const octokit = github.getOctokit(githubToken);
+    const { owner, repo } = github.context.repo;
+
+    // Check if we've already posted this prompt
+    const { data: comments } = await octokit.rest.issues.listComments({
+      owner,
+      repo,
+      issue_number: prNumber,
+    });
+
+    const alreadyPosted = comments.some(c => c.body?.includes('Please add the Asana task URL to this PR description'));
+    if (alreadyPosted) {
+      core.info('Asana URL prompt already posted, skipping');
+      return;
+    }
+
+    await postPRComment(githubToken, prNumber, promptText);
+    core.info('✓ Posted comment asking for Asana task URL');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    core.warning(`Failed to post Asana URL prompt: ${errorMessage}`);
+  }
+}
+
+/**
+ * Evaluate and post multiple comment templates to a PR with deduplication
  *
  * @param commentTemplates - Array of Handlebars templates
  * @param githubToken - GitHub authentication token
@@ -89,10 +126,45 @@ export async function postCommentTemplates(
   core.info('');
   core.info('Posting PR comments...');
 
+  // Fetch existing comments once for deduplication
+  const octokit = github.getOctokit(githubToken);
+  const { owner, repo } = github.context.repo;
+
+  let existingBodies: Set<string>;
+  try {
+    const { data: comments } = await octokit.rest.issues.listComments({
+      owner,
+      repo,
+      issue_number: prNumber,
+    });
+    existingBodies = new Set(comments.map(c => c.body || '').filter(b => b !== ''));
+    core.debug(`Fetched ${comments.length} existing comments for deduplication`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`);
+    existingBodies = new Set();
+  }
+
   for (const [index, template] of commentTemplates.entries()) {
     try {
       const commentBody = evaluateTemplate(template, commentContext);
+
+      // Skip empty comments - usually means conditional logic evaluated to false
+      // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
+      // TODO(docs): Document this behavior - empty comment templates are skipped
+      if (commentBody === '') {
+        core.info(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (empty result)`);
+        continue;
+      }
+
+      // Check for duplicate comment
+      if (existingBodies.has(commentBody)) {
+        core.info(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
+        continue;
+      }
+
       await postPRComment(githubToken, prNumber, commentBody);
+      existingBodies.add(commentBody); // Track what we posted for subsequent templates
       core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

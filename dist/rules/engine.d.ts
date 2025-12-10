@@ -85,6 +85,7 @@ export declare function buildCommentContext(ruleContext: RuleContext, taskResult
         name: string;
         action: string;
     };
+    comments: string | undefined;
     tasks: {
         gid: string;
         name: string;

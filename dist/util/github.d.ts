@@ -18,7 +18,14 @@ export declare function fetchPRComments(githubToken: string, prNumber: number): 
  */
 export declare function postPRComment(githubToken: string, prNumber: number, body: string): Promise<void>;
 /**
- * Evaluate and post multiple comment templates to a PR
+ * Post a comment prompting for Asana URL if not already posted
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ */
+export declare function postMissingAsanaUrlPrompt(githubToken: string, prNumber: number): Promise<void>;
+/**
+ * Evaluate and post multiple comment templates to a PR with deduplication
  *
  * @param commentTemplates - Array of Handlebars templates
  * @param githubToken - GitHub authentication token

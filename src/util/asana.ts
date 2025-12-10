@@ -175,6 +175,8 @@ export async function updateAllTasks(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+      // TODO(feature): Consider posting error details as PR comment for better visibility
+      // Similar to the reusable workflow pattern that posts Asana API errors to PR
       results.push({ ...details, success: false });
     }
   }

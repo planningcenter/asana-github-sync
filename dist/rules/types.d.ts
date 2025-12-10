@@ -32,5 +32,6 @@ export interface Rule {
  */
 export interface RulesConfig {
     rules: Rule[];
+    comment_on_pr_when_asana_url_missing?: boolean;
 }
 //# sourceMappingURL=types.d.ts.map

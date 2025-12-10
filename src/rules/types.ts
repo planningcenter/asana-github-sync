@@ -36,4 +36,5 @@ export interface Rule {
  */
 export interface RulesConfig {
   rules: Rule[];
+  comment_on_pr_when_asana_url_missing?: boolean; // Optional: Post comment when no Asana URL found (default: false)
 }
