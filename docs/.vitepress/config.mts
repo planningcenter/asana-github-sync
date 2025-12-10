@@ -4,6 +4,7 @@ export default defineConfig({
   title: 'Asana GitHub Sync',
   description: 'Rule-based automation for syncing GitHub PRs to Asana',
   base: '/asana-github-sync/',
+  ignoreDeadLinks: true, // TODO: Remove once all pages are created
 
   themeConfig: {
     nav: [
