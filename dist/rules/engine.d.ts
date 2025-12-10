@@ -2,7 +2,7 @@
  * Rules engine - condition matching and execution
  */
 import * as github from '@actions/github';
-import { Rule, Condition } from './types';
+import { Rule, Condition, CreateTaskAction } from './types';
 /**
  * Context for rule evaluation (strongly typed from GitHub)
  */
@@ -24,15 +24,19 @@ export interface RuleContext {
         name: string;
     };
     comments?: string;
+    hasAsanaTasks: boolean;
+    userMappings?: Record<string, string>;
 }
 /**
  * Build rule context from GitHub context
  *
  * @param githubContext - GitHub Actions context
  * @param comments - Optional PR comments (pre-fetched if needed by caller)
+ * @param hasAsanaTasks - Whether PR body contains Asana task links
+ * @param userMappings - Optional GitHub username → Asana user GID mapping
  * @returns Strongly-typed context for rules engine
  */
-export declare function buildRuleContext(githubContext: Pick<typeof github.context, 'eventName' | 'payload'>, comments?: string): RuleContext;
+export declare function buildRuleContext(githubContext: Pick<typeof github.context, 'eventName' | 'payload'>, comments: string | undefined, hasAsanaTasks: boolean, userMappings?: Record<string, string>): RuleContext;
 /**
  * Check if a condition matches the current context
  *
@@ -42,11 +46,23 @@ export declare function buildRuleContext(githubContext: Pick<typeof github.conte
  */
 export declare function matchesCondition(condition: Condition, context: RuleContext): boolean;
 /**
+ * Task creation specification (evaluated from rule)
+ */
+export interface CreateTaskSpec {
+    action: CreateTaskAction;
+    evaluatedTitle: string;
+    evaluatedNotes?: string;
+    evaluatedHtmlNotes?: string;
+    evaluatedAssignee?: string;
+    evaluatedInitialFields: Map<string, string>;
+}
+/**
  * Result of rule execution
  */
 export interface RuleExecutionResult {
     fieldUpdates: Map<string, string>;
     commentTemplates: string[];
+    taskCreationSpecs: CreateTaskSpec[];
 }
 /**
  * Execute all matching rules and collect field updates

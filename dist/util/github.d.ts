@@ -34,4 +34,13 @@ export declare function postMissingAsanaUrlPrompt(githubToken: string, prNumber:
  * @param evaluateTemplate - Template evaluation function
  */
 export declare function postCommentTemplates(commentTemplates: string[], githubToken: string, prNumber: number, commentContext: any, evaluateTemplate: (template: string, context: any) => string): Promise<void>;
+/**
+ * Append Asana task link to PR body
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ * @param taskName - Name of created task
+ * @param taskUrl - URL of created task
+ */
+export declare function appendAsanaLinkToPR(githubToken: string, prNumber: number, taskName: string, taskUrl: string): Promise<void>;
 //# sourceMappingURL=github.d.ts.map

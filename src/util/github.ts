@@ -173,3 +173,48 @@ export async function postCommentTemplates(
     }
   }
 }
+
+/**
+ * Append Asana task link to PR body
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ * @param taskName - Name of created task
+ * @param taskUrl - URL of created task
+ */
+export async function appendAsanaLinkToPR(
+  githubToken: string,
+  prNumber: number,
+  taskName: string,
+  taskUrl: string
+): Promise<void> {
+  try {
+    const octokit = github.getOctokit(githubToken);
+    const { owner, repo } = github.context.repo;
+
+    // Fetch current PR data
+    const { data: pr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: prNumber,
+    });
+
+    const currentBody = pr.body || '';
+
+    // Append Asana link
+    const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+
+    await octokit.rest.pulls.update({
+      owner,
+      repo,
+      pull_number: prNumber,
+      body: newBody,
+    });
+
+    core.info(`✓ Added Asana link to PR #${prNumber}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    core.error(`Failed to update PR body: ${errorMessage}`);
+    // Don't throw - this is not critical enough to fail the workflow
+  }
+}

@@ -15,9 +15,12 @@ export function rulesUseHelper(rules: Rule[], helperName: string): boolean {
   const pattern = new RegExp(`\\{\\{\\s*${helperName}\\s+`, 'g');
 
   for (const rule of rules) {
-    for (const template of Object.values(rule.then.update_fields)) {
-      if (pattern.test(template)) {
-        return true;
+    // Check update_fields if present
+    if (rule.then.update_fields) {
+      for (const template of Object.values(rule.then.update_fields)) {
+        if (pattern.test(template)) {
+          return true;
+        }
       }
     }
   }

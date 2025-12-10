@@ -57,5 +57,48 @@ export function registerHelpers(): void {
     return extractFromText(pattern, comments);
   });
 
-  core.debug('Handlebars extraction helpers registered');
+  // Helper: Clean conventional commit prefixes from title
+  Handlebars.registerHelper('clean_title', function (title: string) {
+    if (!title) return '';
+
+    // Remove conventional commit prefixes:
+    // feat: fix: chore: docs: style: refactor: perf: test:
+    // feat(scope): chore(api): etc.
+    return title.replace(/^(feat|fix|chore|docs|style|refactor|perf|test)(\([^)]+\))?:\s*/, '');
+  });
+
+  // Helper: Sanitize markdown for Asana notes (comprehensive version)
+  Handlebars.registerHelper('sanitize_markdown', function (text: string) {
+    if (!text) return '';
+
+    return (
+      text
+        // Remove markdown images - both linked and standalone
+        .replace(/\[!\[([^\]]*)\]\([^)]+(?:\s+"[^"]*")?\)\]\(([^)]+)\)/g, '') // Linked images
+        .replace(/!\[[^\]]*\]\([^)]+(?:\s+"[^"]*")?\)/g, '') // Standalone images
+        // Remove HTML-style markdown comments
+        .replace(/\[\/\/\]: # \([^)]*\)/g, '')
+        // Remove <details> tags and content
+        .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
+        // Convert <br> to newlines
+        .replace(/<br\s*\/?>/gi, '\n')
+        // Normalize line endings
+        .replace(/\r\n/g, '\n') // Windows to Unix
+        .replace(/\r/g, '\n') // Mac to Unix
+        // Collapse whitespace
+        .replace(/[ \t]+/g, ' ') // Multiple spaces/tabs to single space
+        .replace(/\n[ \t]*/g, '\n') // Remove spaces after newlines
+        .replace(/[ \t]*\n/g, '\n') // Remove spaces before newlines
+        .replace(/\n{3,}/g, '\n\n') // Collapse 3+ newlines to 2
+        .trim()
+    );
+  });
+
+  // Helper: Map GitHub username to Asana user GID
+  Handlebars.registerHelper('map_github_to_asana', function (this: HandlebarsContext, githubUsername: string) {
+    const mappings = this.userMappings || {};
+    return mappings[githubUsername] || ''; // Empty string if not found
+  });
+
+  core.debug('Handlebars helpers registered');
 }

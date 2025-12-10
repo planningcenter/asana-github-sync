@@ -11,12 +11,29 @@ export interface Condition {
     merged?: boolean;
     draft?: boolean;
     label?: string;
+    has_asana_tasks?: boolean;
+    author?: string | string[];
+}
+/**
+ * Task creation action - defines properties for creating a new Asana task
+ */
+export interface CreateTaskAction {
+    project: string;
+    workspace: string;
+    section?: string;
+    title: string;
+    notes?: string;
+    html_notes?: string;
+    assignee?: string;
+    initial_fields?: Record<string, string>;
+    remove_followers?: string[];
 }
 /**
  * Action block - defines what to do when a rule matches
  */
 export interface Action {
-    update_fields: Record<string, string>;
+    create_task?: CreateTaskAction;
+    update_fields?: Record<string, string>;
     mark_complete?: boolean;
     post_pr_comment?: string;
 }
@@ -33,5 +50,7 @@ export interface Rule {
 export interface RulesConfig {
     rules: Rule[];
     comment_on_pr_when_asana_url_missing?: boolean;
+    user_mappings?: Record<string, string>;
+    integration_secret?: string;
 }
 //# sourceMappingURL=types.d.ts.map

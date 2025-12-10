@@ -16,12 +16,20 @@ inputs:
   rules:
     description: 'YAML rules configuration for PR event automation'
     required: true
+  user_mappings:
+    description: 'JSON object mapping GitHub usernames to Asana user GIDs (optional)'
+    required: false
+  integration_secret:
+    description: 'Asana-GitHub integration secret for rich PR attachments (optional)'
+    required: false
 
 outputs:
   task_ids:
-    description: 'Comma-separated list of task IDs found in PR'
+    description: 'Comma-separated list of task IDs found in PR (or created)'
   field_updates:
     description: 'Number of field updates applied'
+  tasks_created:
+    description: 'Number of tasks created'
 
 runs:
   using: 'node20'
