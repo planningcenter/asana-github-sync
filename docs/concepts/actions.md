@@ -8,6 +8,7 @@ Actions define what happens when a rule's conditions match. They appear in the `
 
 ```yaml
 then:
+  attach_pr_to_tasks: true
   update_fields:
     '1234567890': '0987654321'
   mark_complete: true
@@ -22,6 +23,7 @@ Modify **existing** Asana tasks (requires `has_asana_tasks: true` - the default)
 
 - **update_fields** - Update custom field values
 - **mark_complete** - Mark task(s) complete
+- **attach_pr_to_tasks** - Link PR via GitHub integration
 - **post_pr_comment** - Post comment to GitHub PR
 
 ### Create Actions
@@ -132,6 +134,42 @@ Fixes https://app.asana.com/0/111/333
 Both tasks 222 and 333 are marked complete.
 
 See [mark_complete reference](/reference/actions/mark-complete).
+
+## attach_pr_to_tasks
+
+Link PR to Asana tasks via GitHub integration.
+
+### Basic Usage
+
+```yaml
+then:
+  attach_pr_to_tasks: true
+```
+
+### With Field Updates
+
+```yaml
+then:
+  attach_pr_to_tasks: true
+  update_fields:
+    '1234567890': '0987654321'  # Status → "In Review"
+```
+
+### Requirements
+
+Requires `integration_secret` input configured:
+
+```yaml
+- uses: planningcenter/asana-github-sync@main
+  with:
+    asana_token: ${{ secrets.ASANA_TOKEN }}
+    github_token: ${{ github.token }}
+    integration_secret: ${{ secrets.ASANA_INTEGRATION_SECRET }}
+```
+
+Creates integration attachment with live PR status in Asana. Automatically deduplicates.
+
+See [attach_pr_to_tasks reference](/reference/actions/attach-pr-to-tasks).
 
 ## post_pr_comment
 
@@ -245,6 +283,7 @@ then:
 
 ```yaml
 then:
+  attach_pr_to_tasks: true
   update_fields:
     '1234567890': '0987654321'
   mark_complete: true
@@ -368,5 +407,6 @@ then:
 - [create_task](/reference/actions/create-task) - Complete reference
 - [update_fields](/reference/actions/update-fields) - Complete reference
 - [mark_complete](/reference/actions/mark-complete) - Complete reference
+- [attach_pr_to_tasks](/reference/actions/attach-pr-to-tasks) - Complete reference
 - [post_pr_comment](/reference/actions/post-comment) - Complete reference
 - [Templates](/concepts/templates) - Handlebars guide

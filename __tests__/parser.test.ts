@@ -96,4 +96,70 @@ describe('extractAsanaTaskIds', () => {
     const result = extractAsanaTaskIds(body);
     expect(result).toEqual({ taskIds: ['1234567890', '9876543210'], changed: true });
   });
+
+  describe('with previousBody', () => {
+    it('should detect when task IDs changed (different IDs)', () => {
+      const body = 'Task: https://app.asana.com/0/0/1111111111';
+      const previousBody = 'Task: https://app.asana.com/0/0/2222222222';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: ['1111111111'], changed: true });
+    });
+
+    it('should detect when task IDs changed (added ID)', () => {
+      const body = 'Tasks: https://app.asana.com/0/0/1111111111 and https://app.asana.com/0/0/2222222222';
+      const previousBody = 'Task: https://app.asana.com/0/0/1111111111';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: ['1111111111', '2222222222'], changed: true });
+    });
+
+    it('should detect when task IDs changed (removed ID)', () => {
+      const body = 'Task: https://app.asana.com/0/0/1111111111';
+      const previousBody = 'Tasks: https://app.asana.com/0/0/1111111111 and https://app.asana.com/0/0/2222222222';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: ['1111111111'], changed: true });
+    });
+
+    it('should detect no change when task IDs are the same', () => {
+      const body = 'Task: https://app.asana.com/0/0/1111111111';
+      const previousBody = 'Task: https://app.asana.com/0/0/1111111111';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: ['1111111111'], changed: false });
+    });
+
+    it('should detect no change when multiple task IDs are the same (different order)', () => {
+      const body = 'Tasks: https://app.asana.com/0/0/1111111111 and https://app.asana.com/0/0/2222222222';
+      const previousBody = 'Tasks: https://app.asana.com/0/0/2222222222 and https://app.asana.com/0/0/1111111111';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result.changed).toBe(false);
+      // taskIds should be in the order they appear in body
+      expect(result.taskIds).toEqual(['1111111111', '2222222222']);
+    });
+
+    it('should detect change when going from IDs to no IDs', () => {
+      const body = 'No tasks mentioned';
+      const previousBody = 'Task: https://app.asana.com/0/0/1111111111';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: [], changed: true });
+    });
+
+    it('should detect change when going from no IDs to IDs', () => {
+      const body = 'Task: https://app.asana.com/0/0/1111111111';
+      const previousBody = 'No tasks mentioned';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: ['1111111111'], changed: true });
+    });
+
+    it('should detect no change when both have no IDs', () => {
+      const body = 'No tasks mentioned here';
+      const previousBody = 'No tasks here either';
+      const result = extractAsanaTaskIds(body, previousBody);
+      expect(result).toEqual({ taskIds: [], changed: false });
+    });
+
+    it('should handle undefined previousBody as changed', () => {
+      const body = 'Task: https://app.asana.com/0/0/1111111111';
+      const result = extractAsanaTaskIds(body, undefined);
+      expect(result).toEqual({ taskIds: ['1111111111'], changed: true });
+    });
+  });
 });
