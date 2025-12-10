@@ -1,7 +1,7 @@
 /**
  * Rules YAML validation
  */
-import { RulesConfig } from './types';
+import type { RulesConfig } from './types';
 /**
  * Validate rules configuration structure
  *

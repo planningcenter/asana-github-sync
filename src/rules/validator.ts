@@ -2,7 +2,7 @@
  * Rules YAML validation
  */
 
-import { RulesConfig, Rule, CreateTaskAction } from './types';
+import type { RulesConfig, Rule, CreateTaskAction } from './types';
 
 /**
  * Validate rules configuration structure

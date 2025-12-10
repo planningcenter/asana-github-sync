@@ -43,3 +43,33 @@ export interface HandlebarsContext {
   comments?: string; // All PR comments concatenated (if fetched)
   userMappings?: Record<string, string>; // GitHub username → Asana user GID mapping
 }
+
+/**
+ * Task result for comment template evaluation
+ */
+export interface TaskResult {
+  gid: string;
+  name: string;
+  url: string;
+  success: boolean;
+}
+
+/**
+ * Comment context for post-execution PR comment templates
+ * Includes task results and update summary
+ */
+export interface CommentContext {
+  pr: PRContext;
+  event: EventContext;
+  comments?: string;
+  tasks: TaskResult[];
+  updates: {
+    fields: Array<{ gid: string; value: string }>;
+    mark_complete: boolean;
+  };
+  summary: {
+    total: number;
+    success: number;
+    failed: number;
+  };
+}

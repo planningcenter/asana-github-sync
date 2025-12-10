@@ -3,7 +3,7 @@
  */
 
 import * as core from '@actions/core';
-import { AsanaTask } from '../../types';
+import type { AsanaTask } from '../../types';
 import { withRetry } from '../retry';
 import { asanaRequest } from './client';
 import { getFieldSchema, coerceFieldValue } from './fields';

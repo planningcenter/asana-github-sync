@@ -5,7 +5,7 @@
 
 import * as core from '@actions/core';
 import Handlebars from 'handlebars';
-import { HandlebarsContext } from './context';
+import type { HandlebarsContext } from './context';
 
 /**
  * Shared extraction logic

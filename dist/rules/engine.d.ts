@@ -2,7 +2,8 @@
  * Rules engine - condition matching and execution
  */
 import * as github from '@actions/github';
-import { Rule, Condition, CreateTaskAction } from './types';
+import type { Rule, Condition, CreateTaskAction } from './types';
+import type { CommentContext } from '../expression/context';
 /**
  * Context for rule evaluation (strongly typed from GitHub)
  */
@@ -86,41 +87,5 @@ export declare function buildCommentContext(ruleContext: RuleContext, taskResult
     name: string;
     url: string;
     success: boolean;
-}>, fieldUpdates: Map<string, string>): {
-    pr: {
-        number: number;
-        title: string;
-        body: string;
-        merged: boolean;
-        draft: boolean;
-        author: string;
-        assignee?: string;
-        base_ref: string;
-        head_ref: string;
-        url: string;
-    };
-    event: {
-        name: string;
-        action: string;
-    };
-    comments: string | undefined;
-    tasks: {
-        gid: string;
-        name: string;
-        url: string;
-        success: boolean;
-    }[];
-    updates: {
-        fields: {
-            gid: string;
-            value: string;
-        }[];
-        mark_complete: boolean;
-    };
-    summary: {
-        total: number;
-        success: number;
-        failed: number;
-    };
-};
+}>, fieldUpdates: Map<string, string>): CommentContext;
 //# sourceMappingURL=engine.d.ts.map

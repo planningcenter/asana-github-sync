@@ -42865,7 +42865,6 @@ const asana_1 = __nccwpck_require__(7757);
 const github_1 = __nccwpck_require__(3585);
 const helpers_1 = __nccwpck_require__(3915);
 const template_analysis_1 = __nccwpck_require__(5127);
-const github_2 = __nccwpck_require__(3585);
 const evaluator_1 = __nccwpck_require__(5851);
 async function run() {
     try {
@@ -42892,7 +42891,7 @@ async function run() {
             core.info('Rules use extract_from_comments, fetching PR comments...');
             const prNumber = github.context.payload.pull_request?.number;
             if (prNumber) {
-                comments = await (0, github_2.fetchPRComments)(githubToken, prNumber);
+                comments = await (0, github_1.fetchPRComments)(githubToken, prNumber);
             }
             else {
                 core.warning('No PR number found in payload, cannot fetch comments');
@@ -42936,7 +42935,7 @@ async function run() {
             // Post PR comments if configured
             if (commentTemplates.length > 0) {
                 const commentContext = (0, engine_1.buildCommentContext)(context, createdTasks, fieldUpdates);
-                await (0, github_2.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
+                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
             }
             // Log summary
             core.info('');
@@ -42977,7 +42976,7 @@ async function run() {
                 const prNumber = github.context.payload.pull_request?.number;
                 if (prNumber) {
                     const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
-                    await (0, github_2.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
+                    await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
                 }
                 else {
                     core.warning('No PR number found in payload, cannot post comments');
@@ -43547,6 +43546,12 @@ exports.asanaRequest = asanaRequest;
 const errors_1 = __nccwpck_require__(17);
 exports.ASANA_API_BASE = 'https://app.asana.com/api/1.0';
 /**
+ * Type guard to validate Asana API response structure
+ */
+function isAsanaResponse(value) {
+    return typeof value === 'object' && value !== null && 'data' in value;
+}
+/**
  * Make an authenticated request to the Asana API
  *
  * @param token - Asana Personal Access Token
@@ -43567,7 +43572,10 @@ async function asanaRequest(token, endpoint, options = {}) {
         const errorBody = await response.text();
         throw new errors_1.ApiError(`Asana API error: ${response.status} ${response.statusText}`, response.status, errorBody);
     }
-    const json = (await response.json());
+    const json = await response.json();
+    if (!isAsanaResponse(json)) {
+        throw new errors_1.ApiError('Invalid response format from Asana API', 500, JSON.stringify(json));
+    }
     return json.data;
 }
 
@@ -44308,12 +44316,12 @@ function readRulesConfig() {
         try {
             // Try YAML first (supports both YAML and JSON since JSON is valid YAML)
             const parsed = yaml.load(userMappingsInput);
-            if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            if (isStringRecord(parsed)) {
                 userMappings = parsed;
                 core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
             }
             else {
-                throw new Error('user_mappings must be an object/map');
+                throw new Error('user_mappings must be an object/map with string values');
             }
         }
         catch (error) {
@@ -44336,6 +44344,24 @@ function readRulesConfig() {
     };
 }
 /**
+ * Type guard to check if value is a Record<string, string>
+ */
+function isStringRecord(value) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return false;
+    }
+    return Object.values(value).every(val => typeof val === 'string');
+}
+/**
+ * Type guard to check if value is a RulesConfig
+ */
+function isRulesConfig(value) {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+    return 'rules' in value && Array.isArray(value.rules);
+}
+/**
  * Parse rules YAML string
  *
  * @param yamlStr - YAML string containing rules
@@ -44345,6 +44371,9 @@ function readRulesConfig() {
 function parseRulesYAML(yamlStr) {
     try {
         const parsed = yaml.load(yamlStr);
+        if (!isRulesConfig(parsed)) {
+            throw new Error('Invalid rules configuration structure');
+        }
         return parsed;
     }
     catch (error) {

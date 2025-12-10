@@ -4,9 +4,9 @@
 
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { Rule, Condition, CreateTaskAction } from './types';
+import type { Rule, Condition, CreateTaskAction } from './types';
 import { evaluateTemplate } from '../expression/evaluator';
-import { HandlebarsContext } from '../expression/context';
+import type { HandlebarsContext, CommentContext } from '../expression/context';
 
 /**
  * Context for rule evaluation (strongly typed from GitHub)
@@ -340,7 +340,7 @@ export function buildCommentContext(
   ruleContext: RuleContext,
   taskResults: Array<{ gid: string; name: string; url: string; success: boolean }>,
   fieldUpdates: Map<string, string>
-) {
+): CommentContext {
   const successCount = taskResults.filter((t) => t.success).length;
   const failedCount = taskResults.filter((t) => !t.success).length;
 

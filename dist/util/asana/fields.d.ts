@@ -1,7 +1,7 @@
 /**
  * Custom field operations - schema fetching, caching, and value coercion
  */
-import { AsanaCustomField } from '../../types';
+import type { AsanaCustomField } from '../../types';
 /**
  * Clear the field schema cache (primarily for testing)
  */

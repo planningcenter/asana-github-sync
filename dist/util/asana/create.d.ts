@@ -1,7 +1,7 @@
 /**
  * Task creation operations
  */
-import { CreateTaskSpec } from '../../rules/engine';
+import type { CreateTaskSpec } from '../../rules/engine';
 /**
  * PR metadata for integration attachment
  */

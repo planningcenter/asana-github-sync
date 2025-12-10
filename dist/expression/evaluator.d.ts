@@ -2,7 +2,7 @@
  * Handlebars template evaluator
  * Thin wrapper around Handlebars.compile() with error handling
  */
-import { HandlebarsContext } from './context';
+import type { HandlebarsContext, CommentContext } from './context';
 /**
  * Evaluate a Handlebars template with given context
  *
@@ -10,5 +10,5 @@ import { HandlebarsContext } from './context';
  * @param context - Context object with PR/event data
  * @returns Evaluated string, or empty string if evaluation fails
  */
-export declare function evaluateTemplate(template: string, context: HandlebarsContext): string;
+export declare function evaluateTemplate(template: string, context: HandlebarsContext | CommentContext): string;
 //# sourceMappingURL=evaluator.d.ts.map

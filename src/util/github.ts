@@ -4,6 +4,7 @@
 
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import type { HandlebarsContext, CommentContext } from '../expression/context';
 
 /**
  * Fetch all comments for a pull request
@@ -79,8 +80,8 @@ export async function postCommentTemplates(
   commentTemplates: string[],
   githubToken: string,
   prNumber: number,
-  commentContext: any,
-  evaluateTemplate: (template: string, context: any) => string
+  commentContext: CommentContext,
+  evaluateTemplate: (template: string, context: HandlebarsContext | CommentContext) => string
 ): Promise<void> {
   if (commentTemplates.length === 0) {
     return;

@@ -1,6 +1,7 @@
 /**
  * GitHub API utilities
  */
+import type { HandlebarsContext, CommentContext } from '../expression/context';
 /**
  * Fetch all comments for a pull request
  *
@@ -26,7 +27,7 @@ export declare function postPRComment(githubToken: string, prNumber: number, bod
  * @param commentContext - Context object for template evaluation
  * @param evaluateTemplate - Template evaluation function
  */
-export declare function postCommentTemplates(commentTemplates: string[], githubToken: string, prNumber: number, commentContext: any, evaluateTemplate: (template: string, context: any) => string): Promise<void>;
+export declare function postCommentTemplates(commentTemplates: string[], githubToken: string, prNumber: number, commentContext: CommentContext, evaluateTemplate: (template: string, context: HandlebarsContext | CommentContext) => string): Promise<void>;
 /**
  * Append Asana task link to PR body
  *

@@ -3,7 +3,7 @@
  */
 
 import * as core from '@actions/core';
-import { AsanaCustomField, AsanaEnumOption } from '../../types';
+import type { AsanaCustomField, AsanaEnumOption } from '../../types';
 import { withRetry } from '../retry';
 import { asanaRequest } from './client';
 

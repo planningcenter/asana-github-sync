@@ -2,7 +2,7 @@
  * Utilities for analyzing templates in rules
  */
 
-import { Rule } from '../rules/types';
+import type { Rule } from '../rules/types';
 
 /**
  * Check if any rule uses a specific Handlebars helper

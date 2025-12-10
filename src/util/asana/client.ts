@@ -7,6 +7,13 @@ import { ApiError } from '../errors';
 export const ASANA_API_BASE = 'https://app.asana.com/api/1.0';
 
 /**
+ * Type guard to validate Asana API response structure
+ */
+function isAsanaResponse<T>(value: unknown): value is { data: T } {
+  return typeof value === 'object' && value !== null && 'data' in value;
+}
+
+/**
  * Make an authenticated request to the Asana API
  *
  * @param token - Asana Personal Access Token
@@ -33,6 +40,13 @@ export async function asanaRequest<T = unknown>(token: string, endpoint: string,
     );
   }
 
-  const json = (await response.json()) as { data: T };
+  const json = await response.json();
+  if (!isAsanaResponse<T>(json)) {
+    throw new ApiError(
+      'Invalid response format from Asana API',
+      500,
+      JSON.stringify(json)
+    );
+  }
   return json.data;
 }

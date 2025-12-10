@@ -4,7 +4,7 @@
 
 import * as core from '@actions/core';
 import * as yaml from 'js-yaml';
-import { RulesConfig } from '../rules/types';
+import type { RulesConfig } from '../rules/types';
 
 /**
  * Read rules input (for v2.0 rules engine)
@@ -31,11 +31,11 @@ export function readRulesConfig(): {
     try {
       // Try YAML first (supports both YAML and JSON since JSON is valid YAML)
       const parsed = yaml.load(userMappingsInput);
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        userMappings = parsed as Record<string, string>;
+      if (isStringRecord(parsed)) {
+        userMappings = parsed;
         core.info(`✓ Loaded ${Object.keys(userMappings).length} user mapping(s)`);
       } else {
-        throw new Error('user_mappings must be an object/map');
+        throw new Error('user_mappings must be an object/map with string values');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -61,6 +61,26 @@ export function readRulesConfig(): {
 }
 
 /**
+ * Type guard to check if value is a Record<string, string>
+ */
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(val => typeof val === 'string');
+}
+
+/**
+ * Type guard to check if value is a RulesConfig
+ */
+function isRulesConfig(value: unknown): value is RulesConfig {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  return 'rules' in value && Array.isArray(value.rules);
+}
+
+/**
  * Parse rules YAML string
  *
  * @param yamlStr - YAML string containing rules
@@ -70,7 +90,10 @@ export function readRulesConfig(): {
 export function parseRulesYAML(yamlStr: string): RulesConfig {
   try {
     const parsed = yaml.load(yamlStr);
-    return parsed as RulesConfig;
+    if (!isRulesConfig(parsed)) {
+      throw new Error('Invalid rules configuration structure');
+    }
+    return parsed;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid YAML: ${errorMessage}`);

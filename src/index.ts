@@ -10,10 +10,9 @@ import { validateRulesConfig } from './rules/validator';
 import { buildRuleContext, executeRules, buildCommentContext } from './rules/engine';
 import { extractAsanaTaskIds } from './util/parser';
 import { fetchAllTaskDetails, updateAllTasks, createAllTasks } from './util/asana';
-import { appendAsanaLinkToPR } from './util/github';
+import { appendAsanaLinkToPR, fetchPRComments, postCommentTemplates } from './util/github';
 import { registerHelpers } from './expression/helpers';
 import { rulesUseHelper } from './util/template-analysis';
-import { fetchPRComments, postCommentTemplates } from './util/github';
 import { evaluateTemplate } from './expression/evaluator';
 
 /**

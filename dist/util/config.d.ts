@@ -1,7 +1,7 @@
 /**
  * Configuration management for action inputs
  */
-import { RulesConfig } from '../rules/types';
+import type { RulesConfig } from '../rules/types';
 /**
  * Read rules input (for v2.0 rules engine)
  *
