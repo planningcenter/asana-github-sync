@@ -36,14 +36,14 @@ async function run(): Promise<void> {
     validateRulesConfig(rules);
 
     core.info(`✓ Rules configuration loaded`);
-    core.info(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
-    core.info(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
-    core.info(`  - Rules: ${rules.rules.length} rule(s) configured`);
+    core.debug(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
+    core.debug(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
+    core.debug(`  - Rules: ${rules.rules.length} rule(s) configured`);
     if (Object.keys(userMappings).length > 0) {
-      core.info(`  - User mappings: ${Object.keys(userMappings).length} mapping(s)`);
+      core.debug(`  - User mappings: ${Object.keys(userMappings).length} mapping(s)`);
     }
     if (integrationSecret) {
-      core.info(`  - Integration secret: configured`);
+      core.debug(`  - Integration secret: configured`);
     }
 
     // Check if any rule uses extract_from_comments helper
@@ -51,7 +51,7 @@ async function run(): Promise<void> {
     let comments: string | undefined;
 
     if (needsComments) {
-      core.info('Rules use extract_from_comments, fetching PR comments...');
+      core.debug('Rules use extract_from_comments, fetching PR comments...');
       const prNumber = github.context.payload.pull_request?.number;
 
       if (prNumber) {

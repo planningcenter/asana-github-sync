@@ -47,7 +47,7 @@ export async function createTask(
   const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } =
     spec;
 
-  core.info(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
+  core.debug(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
 
   // Build task data
   const taskData: Record<string, unknown> = {
@@ -164,7 +164,7 @@ async function removeTaskFollowers(taskGid: string, followers: string[], asanaTo
     );
   }
 
-  core.info(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
+  core.debug(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
 }
 
 /**
@@ -179,7 +179,7 @@ export async function attachPRViaIntegration(
   prMetadata: PRMetadata,
   integrationSecret: string,
 ): Promise<void> {
-  core.info(`Attaching PR ${prMetadata.url} to task via integration...`);
+  core.debug(`Attaching PR ${prMetadata.url} to task via integration...`);
 
   // Build full PR description including task link (matching reference implementation)
   const prDescription = `${prMetadata.body || ''}\n\n---\n\nAsana task: [${taskUrl}](${taskUrl})`;

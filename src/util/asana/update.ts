@@ -95,7 +95,7 @@ export async function updateTaskFields(
       }
 
       customFields[fieldGid] = coercedValue;
-      core.info(`  ✓ Field ${fieldGid} (${schema.type}): "${rawValue}" → ${coercedValue}`);
+      core.debug(`  ✓ Field ${fieldGid} (${schema.type}): "${rawValue}" → ${coercedValue}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       core.error(`Skipping field ${fieldGid}: ${errorMessage}`);
@@ -119,7 +119,7 @@ export async function updateTaskFields(
   }
 
   // Single PUT request
-  core.info(
+  core.debug(
     `Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`
   );
 

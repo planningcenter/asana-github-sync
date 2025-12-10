@@ -26,7 +26,7 @@ export async function fetchPRComments(githubToken: string, prNumber: number): Pr
     });
 
     const comments = commentsResponse.data.map(c => c.body || '').join('\n');
-    core.info(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`);
+    core.debug(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`);
 
     return comments;
   } catch (error) {
@@ -123,7 +123,7 @@ export async function postCommentTemplates(
 
       // Check for duplicate comment
       if (existingBodies.has(commentBody)) {
-        core.info(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
+        core.debug(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
         continue;
       }
 
