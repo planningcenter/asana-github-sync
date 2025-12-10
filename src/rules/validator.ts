@@ -89,4 +89,13 @@ function validateRule(rule: Rule, index: number): void {
   if (rule.then.mark_complete !== undefined && typeof rule.then.mark_complete !== 'boolean') {
     throw new Error(`${prefix} 'mark_complete' must be a boolean`);
   }
+
+  if (rule.then.post_pr_comment !== undefined) {
+    if (typeof rule.then.post_pr_comment !== 'string') {
+      throw new Error(`${prefix} 'post_pr_comment' must be a string`);
+    }
+    if (rule.then.post_pr_comment.trim().length === 0) {
+      throw new Error(`${prefix} 'post_pr_comment' cannot be empty`);
+    }
+  }
 }

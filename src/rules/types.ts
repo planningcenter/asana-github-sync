@@ -20,6 +20,7 @@ export interface Condition {
 export interface Action {
   update_fields: Record<string, string>; // Map of field GID → value (can be template string)
   mark_complete?: boolean; // Optional: Mark task complete
+  post_pr_comment?: string; // Optional: Handlebars template for PR comment
 }
 
 /**

@@ -70,6 +70,119 @@ async function fetchCustomField(token: string, customFieldGid: string) {
 }
 
 /**
+ * Fetch task details (name and URL)
+ *
+ * @param taskGid - Task GID to fetch
+ * @param asanaToken - Asana API token
+ * @returns Task details with gid, name, and url
+ */
+export async function fetchTaskDetails(
+  taskGid: string,
+  asanaToken: string
+): Promise<{ gid: string; name: string; url: string }> {
+  core.debug(`Fetching details for task ${taskGid}...`);
+
+  const task = await withRetry(
+    () =>
+      asanaRequest<AsanaTask>(asanaToken, `/tasks/${taskGid}?opt_fields=gid,name,permalink_url`),
+    `fetch task ${taskGid}`
+  );
+
+  return {
+    gid: task.gid,
+    name: task.name,
+    // Fallback to constructed URL if permalink_url not available
+    url: task.permalink_url || `https://app.asana.com/0/0/${task.gid}/f`,
+  };
+}
+
+/**
+ * Fetch details for multiple tasks
+ * Handles failures gracefully by using placeholder details
+ *
+ * @param taskGids - Array of task GIDs to fetch
+ * @param asanaToken - Asana API token
+ * @returns Array of task details (with placeholders for failed fetches)
+ */
+export async function fetchAllTaskDetails(
+  taskGids: string[],
+  asanaToken: string
+): Promise<Array<{ gid: string; name: string; url: string }>> {
+  core.info('Fetching task details...');
+
+  const results: Array<{ gid: string; name: string; url: string }> = [];
+
+  for (const taskGid of taskGids) {
+    try {
+      const details = await fetchTaskDetails(taskGid, asanaToken);
+      results.push(details);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.warning(`Failed to fetch details for task ${taskGid}: ${errorMessage}`);
+      // Add placeholder so we can still proceed
+      results.push({
+        gid: taskGid,
+        name: `Task ${taskGid}`,
+        url: `https://app.asana.com/0/0/${taskGid}/f`,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Task update result (includes success status)
+ */
+export interface TaskUpdateResult {
+  gid: string;
+  name: string;
+  url: string;
+  success: boolean;
+}
+
+/**
+ * Update multiple tasks with the same field updates
+ * Handles failures gracefully and tracks success/failure per task
+ *
+ * @param taskIds - Array of task GIDs to update
+ * @param taskDetails - Array of task details (parallel to taskIds)
+ * @param fieldUpdates - Map of field updates to apply
+ * @param asanaToken - Asana API token
+ * @returns Array of task results with success status
+ */
+export async function updateAllTasks(
+  taskIds: string[],
+  taskDetails: Array<{ gid: string; name: string; url: string }>,
+  fieldUpdates: Map<string, string>,
+  asanaToken: string
+): Promise<TaskUpdateResult[]> {
+  const results: TaskUpdateResult[] = [];
+
+  for (let i = 0; i < taskIds.length; i++) {
+    const taskId = taskIds[i];
+    const details = taskDetails[i] || {
+      gid: taskId,
+      name: `Task ${taskId}`,
+      url: `https://app.asana.com/0/0/${taskId}/f`,
+    };
+
+    try {
+      if (fieldUpdates.size > 0) {
+        await updateTaskFields(taskId, fieldUpdates, asanaToken);
+      }
+      results.push({ ...details, success: true });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+      results.push({ ...details, success: false });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Find enum option matching the target state name
  *
  * @param customField - Custom field definition

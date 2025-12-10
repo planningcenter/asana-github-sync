@@ -42664,6 +42664,106 @@ function evaluateTemplate(template, context) {
 
 /***/ }),
 
+/***/ 3915:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * Handlebars helpers for regex extraction
+ * Provides extract_from_body, extract_from_title, extract_from_comments
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.registerHelpers = registerHelpers;
+const core = __importStar(__nccwpck_require__(7484));
+const handlebars_1 = __importDefault(__nccwpck_require__(8508));
+/**
+ * Shared extraction logic
+ * Applies regex pattern to text and returns first capture group
+ *
+ * @param pattern - Regular expression pattern (must have a capture group)
+ * @param text - Text to search in
+ * @returns First capture group value, or empty string if no match
+ */
+function extractFromText(pattern, text) {
+    try {
+        const regex = new RegExp(pattern);
+        const match = regex.exec(text);
+        if (!match) {
+            return '';
+        }
+        // Return first capture group (match[1]) if it exists, otherwise full match (match[0])
+        return match[1] !== undefined ? match[1] : match[0];
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.error(`Invalid regex pattern "${pattern}": ${errorMessage}`);
+        return '';
+    }
+}
+/**
+ * Register all Handlebars helpers
+ * Call this once at startup before evaluating templates
+ */
+function registerHelpers() {
+    // Helper: Extract from PR body
+    handlebars_1.default.registerHelper('extract_from_body', function (pattern) {
+        const body = this.pr?.body || '';
+        return extractFromText(pattern, body);
+    });
+    // Helper: Extract from PR title
+    handlebars_1.default.registerHelper('extract_from_title', function (pattern) {
+        const title = this.pr?.title || '';
+        return extractFromText(pattern, title);
+    });
+    // Helper: Extract from PR comments
+    // Requires comments to be pre-fetched and added to context
+    handlebars_1.default.registerHelper('extract_from_comments', function (pattern) {
+        const comments = this.comments || '';
+        return extractFromText(pattern, comments);
+    });
+    core.debug('Handlebars extraction helpers registered');
+}
+
+
+/***/ }),
+
 /***/ 9407:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -42714,8 +42814,14 @@ const validator_1 = __nccwpck_require__(1685);
 const engine_1 = __nccwpck_require__(9693);
 const parser_1 = __nccwpck_require__(4325);
 const asana_1 = __nccwpck_require__(4038);
+const helpers_1 = __nccwpck_require__(3915);
+const template_analysis_1 = __nccwpck_require__(5127);
+const github_1 = __nccwpck_require__(3585);
+const evaluator_1 = __nccwpck_require__(5851);
 async function run() {
     try {
+        // Register Handlebars helpers for template evaluation
+        (0, helpers_1.registerHelpers)();
         // Read and validate rules configuration
         core.info('Reading rules configuration...');
         const { asanaToken, githubToken, rules } = (0, config_1.readRulesConfig)();
@@ -42724,8 +42830,22 @@ async function run() {
         core.info(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
         core.info(`  - GitHub token: ${githubToken.substring(0, 3)}...`);
         core.info(`  - Rules: ${rules.rules.length} rule(s) configured`);
+        // Check if any rule uses extract_from_comments helper
+        const needsComments = (0, template_analysis_1.rulesUseHelper)(rules.rules, 'extract_from_comments');
+        let comments;
+        if (needsComments) {
+            core.info('Rules use extract_from_comments, fetching PR comments...');
+            const prNumber = github.context.payload.pull_request?.number;
+            if (prNumber) {
+                comments = await (0, github_1.fetchPRComments)(githubToken, prNumber);
+            }
+            else {
+                core.warning('No PR number found in payload, cannot fetch comments');
+                comments = '';
+            }
+        }
         // Build rule context from GitHub event
-        const context = (0, engine_1.buildRuleContext)(github.context);
+        const context = (0, engine_1.buildRuleContext)(github.context, comments);
         core.info(`Event: ${context.eventName}, Action: ${context.action}`);
         core.info(`PR #${context.pr.number}: ${context.pr.title}`);
         // Extract Asana task IDs from PR body
@@ -42735,34 +42855,44 @@ async function run() {
             return;
         }
         core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
-        // Execute rules to get field updates
-        const fieldUpdates = (0, engine_1.executeRules)(rules.rules, context);
-        if (fieldUpdates.size === 0) {
+        // Execute rules to get field updates and comment templates
+        const { fieldUpdates, commentTemplates } = (0, engine_1.executeRules)(rules.rules, context);
+        if (fieldUpdates.size === 0 && commentTemplates.length === 0) {
             core.info('No rules matched, skipping');
             return;
         }
         core.info(`${fieldUpdates.size} field update(s) to apply`);
-        // Update all Asana tasks
-        let successCount = 0;
-        const failedTasks = [];
-        for (const taskId of taskIds) {
-            try {
-                await (0, asana_1.updateTaskFields)(taskId, fieldUpdates, asanaToken);
-                successCount++;
+        if (commentTemplates.length > 0) {
+            core.info(`${commentTemplates.length} PR comment(s) configured`);
+        }
+        // Fetch task details if comment templates exist
+        let taskDetails = [];
+        if (commentTemplates.length > 0) {
+            taskDetails = await (0, asana_1.fetchAllTaskDetails)(taskIds, asanaToken);
+        }
+        // Update all Asana tasks and collect results
+        const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken);
+        const successCount = taskResults.filter((t) => t.success).length;
+        const failedCount = taskResults.filter((t) => !t.success).length;
+        // Post PR comments if configured
+        if (commentTemplates.length > 0) {
+            const prNumber = github.context.payload.pull_request?.number;
+            if (prNumber) {
+                const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
+                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
             }
-            catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                core.error(`Failed to update task ${taskId}: ${errorMessage}`);
-                failedTasks.push(taskId);
+            else {
+                core.warning('No PR number found in payload, cannot post comments');
             }
         }
         // Log summary
         core.info('');
         core.info(`=== Update Summary ===`);
-        core.info(`Total tasks: ${taskIds.length}`);
+        core.info(`Total tasks: ${taskResults.length}`);
         core.info(`✓ Successful: ${successCount}`);
-        if (failedTasks.length > 0) {
-            core.info(`✗ Failed: ${failedTasks.length} (${failedTasks.join(', ')})`);
+        if (failedCount > 0) {
+            const failedTaskIds = taskResults.filter((t) => !t.success).map((t) => t.gid);
+            core.info(`✗ Failed: ${failedCount} (${failedTaskIds.join(', ')})`);
         }
         core.info('');
         // Set outputs
@@ -42830,15 +42960,17 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.buildRuleContext = buildRuleContext;
 exports.matchesCondition = matchesCondition;
 exports.executeRules = executeRules;
+exports.buildCommentContext = buildCommentContext;
 const core = __importStar(__nccwpck_require__(7484));
 const evaluator_1 = __nccwpck_require__(5851);
 /**
  * Build rule context from GitHub context
  *
  * @param githubContext - GitHub Actions context
+ * @param comments - Optional PR comments (pre-fetched if needed by caller)
  * @returns Strongly-typed context for rules engine
  */
-function buildRuleContext(githubContext) {
+function buildRuleContext(githubContext, comments) {
     const { eventName, payload } = githubContext;
     const pr = payload.pull_request;
     if (!pr) {
@@ -42863,6 +42995,9 @@ function buildRuleContext(githubContext) {
         context.label = {
             name: payload.label.name,
         };
+    }
+    if (comments !== undefined) {
+        context.comments = comments;
     }
     return context;
 }
@@ -42906,10 +43041,11 @@ function matchesCondition(condition, context) {
  *
  * @param rules - Array of rules to evaluate
  * @param context - Current PR/event context (strongly typed)
- * @returns Map of field GID → evaluated value, plus special __mark_complete flag if needed
+ * @returns Field updates and comment templates from matching rules
  */
 function executeRules(rules, context) {
     const fieldUpdates = new Map();
+    const commentTemplates = [];
     let shouldMarkComplete = false;
     for (const [index, rule] of rules.entries()) {
         if (!matchesCondition(rule.when, context)) {
@@ -42925,6 +43061,7 @@ function executeRules(rules, context) {
                 action: context.action,
             },
             label: context.label,
+            comments: context.comments,
         };
         // Evaluate each field template with Handlebars
         for (const [fieldGid, template] of Object.entries(rule.then.update_fields)) {
@@ -42944,12 +43081,48 @@ function executeRules(rules, context) {
         if (rule.then.mark_complete) {
             shouldMarkComplete = true;
         }
+        // Collect comment template if present
+        if (rule.then.post_pr_comment) {
+            commentTemplates.push(rule.then.post_pr_comment);
+            core.info(`  Will post PR comment (template ${commentTemplates.length})`);
+        }
     }
     // Add special flag for task completion
     if (shouldMarkComplete) {
         fieldUpdates.set('__mark_complete', 'true');
     }
-    return fieldUpdates;
+    return { fieldUpdates, commentTemplates };
+}
+/**
+ * Build Handlebars context for comment template evaluation
+ *
+ * @param ruleContext - Original rule context (PR, event data)
+ * @param taskResults - Array of task update results with success status
+ * @param fieldUpdates - Map of field updates that were applied
+ * @returns Handlebars context object for comment templates
+ */
+function buildCommentContext(ruleContext, taskResults, fieldUpdates) {
+    const successCount = taskResults.filter((t) => t.success).length;
+    const failedCount = taskResults.filter((t) => !t.success).length;
+    return {
+        pr: ruleContext.pr,
+        event: {
+            name: ruleContext.eventName,
+            action: ruleContext.action,
+        },
+        tasks: taskResults,
+        updates: {
+            fields: Array.from(fieldUpdates.entries())
+                .filter(([gid]) => gid !== '__mark_complete')
+                .map(([gid, value]) => ({ gid, value })),
+            mark_complete: fieldUpdates.has('__mark_complete'),
+        },
+        summary: {
+            total: taskResults.length,
+            success: successCount,
+            failed: failedCount,
+        },
+    };
 }
 
 
@@ -43036,29 +43209,15 @@ function validateRule(rule, index) {
     if (rule.then.mark_complete !== undefined && typeof rule.then.mark_complete !== 'boolean') {
         throw new Error(`${prefix} 'mark_complete' must be a boolean`);
     }
+    if (rule.then.post_pr_comment !== undefined) {
+        if (typeof rule.then.post_pr_comment !== 'string') {
+            throw new Error(`${prefix} 'post_pr_comment' must be a string`);
+        }
+        if (rule.then.post_pr_comment.trim().length === 0) {
+            throw new Error(`${prefix} 'post_pr_comment' cannot be empty`);
+        }
+    }
 }
-
-
-/***/ }),
-
-/***/ 8522:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/**
- * Core type definitions for Asana-GitHub Sync Action
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TransitionType = void 0;
-/**
- * Types of state transitions supported
- */
-var TransitionType;
-(function (TransitionType) {
-    TransitionType["ON_OPENED"] = "ON_OPENED";
-    TransitionType["ON_MERGED"] = "ON_MERGED";
-})(TransitionType || (exports.TransitionType = TransitionType = {}));
 
 
 /***/ }),
@@ -43105,14 +43264,27 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.updateTaskStatus = updateTaskStatus;
+exports.clearFieldSchemaCache = clearFieldSchemaCache;
+exports.fetchTaskDetails = fetchTaskDetails;
+exports.fetchAllTaskDetails = fetchAllTaskDetails;
+exports.updateAllTasks = updateAllTasks;
 exports.updateTaskFields = updateTaskFields;
 const core = __importStar(__nccwpck_require__(7484));
-const types_1 = __nccwpck_require__(8522);
-const transition_1 = __nccwpck_require__(2837);
 const retry_1 = __nccwpck_require__(4266);
 const errors_1 = __nccwpck_require__(17);
 const ASANA_API_BASE = 'https://app.asana.com/api/1.0';
+/**
+ * Module-level cache for custom field schemas
+ * Persists for the lifetime of the action run to avoid redundant API calls
+ * when updating multiple tasks with the same fields
+ */
+const fieldSchemaCache = new Map();
+/**
+ * Clear the field schema cache (primarily for testing)
+ */
+function clearFieldSchemaCache() {
+    fieldSchemaCache.clear();
+}
 /**
  * Make an authenticated request to the Asana API
  *
@@ -43149,6 +43321,85 @@ async function fetchCustomField(token, customFieldGid) {
     return await (0, retry_1.withRetry)(() => asanaRequest(token, `/custom_fields/${customFieldGid}`), `fetch custom field ${customFieldGid}`);
 }
 /**
+ * Fetch task details (name and URL)
+ *
+ * @param taskGid - Task GID to fetch
+ * @param asanaToken - Asana API token
+ * @returns Task details with gid, name, and url
+ */
+async function fetchTaskDetails(taskGid, asanaToken) {
+    core.debug(`Fetching details for task ${taskGid}...`);
+    const task = await (0, retry_1.withRetry)(() => asanaRequest(asanaToken, `/tasks/${taskGid}?opt_fields=gid,name,permalink_url`), `fetch task ${taskGid}`);
+    return {
+        gid: task.gid,
+        name: task.name,
+        // Fallback to constructed URL if permalink_url not available
+        url: task.permalink_url || `https://app.asana.com/0/0/${task.gid}/f`,
+    };
+}
+/**
+ * Fetch details for multiple tasks
+ * Handles failures gracefully by using placeholder details
+ *
+ * @param taskGids - Array of task GIDs to fetch
+ * @param asanaToken - Asana API token
+ * @returns Array of task details (with placeholders for failed fetches)
+ */
+async function fetchAllTaskDetails(taskGids, asanaToken) {
+    core.info('Fetching task details...');
+    const results = [];
+    for (const taskGid of taskGids) {
+        try {
+            const details = await fetchTaskDetails(taskGid, asanaToken);
+            results.push(details);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to fetch details for task ${taskGid}: ${errorMessage}`);
+            // Add placeholder so we can still proceed
+            results.push({
+                gid: taskGid,
+                name: `Task ${taskGid}`,
+                url: `https://app.asana.com/0/0/${taskGid}/f`,
+            });
+        }
+    }
+    return results;
+}
+/**
+ * Update multiple tasks with the same field updates
+ * Handles failures gracefully and tracks success/failure per task
+ *
+ * @param taskIds - Array of task GIDs to update
+ * @param taskDetails - Array of task details (parallel to taskIds)
+ * @param fieldUpdates - Map of field updates to apply
+ * @param asanaToken - Asana API token
+ * @returns Array of task results with success status
+ */
+async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
+    const results = [];
+    for (let i = 0; i < taskIds.length; i++) {
+        const taskId = taskIds[i];
+        const details = taskDetails[i] || {
+            gid: taskId,
+            name: `Task ${taskId}`,
+            url: `https://app.asana.com/0/0/${taskId}/f`,
+        };
+        try {
+            if (fieldUpdates.size > 0) {
+                await updateTaskFields(taskId, fieldUpdates, asanaToken);
+            }
+            results.push({ ...details, success: true });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.error(`Failed to update task ${taskId}: ${errorMessage}`);
+            results.push({ ...details, success: false });
+        }
+    }
+    return results;
+}
+/**
  * Find enum option matching the target state name
  *
  * @param customField - Custom field definition
@@ -43171,86 +43422,57 @@ function findEnumOption(customField, stateName, customFieldGid) {
     return matchingOption.gid;
 }
 /**
- * Update task with new custom field value and optionally mark complete
+ * Coerce a raw string value to the appropriate type for an Asana custom field
+ * Returns null if the value is invalid for the field type
  *
- * @param token - Asana Personal Access Token
- * @param taskId - Task GID
- * @param customFieldGid - Custom field GID
- * @param enumGid - Enum option GID
- * @param markComplete - Whether to mark task as complete
+ * @param schema - The custom field schema from Asana
+ * @param rawValue - The raw string value from template evaluation
+ * @param fieldGid - The field GID (for error messages)
+ * @returns The coerced value, or null if validation fails
  */
-async function updateTask(token, taskId, customFieldGid, enumGid, markComplete) {
-    const updateData = {
-        custom_fields: {
-            [customFieldGid]: enumGid,
-        },
-    };
-    if (markComplete) {
-        updateData.completed = true;
-    }
-    await (0, retry_1.withRetry)(() => asanaRequest(token, `/tasks/${taskId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ data: updateData }),
-    }), `update task ${taskId}`);
-}
-/**
- * Log error based on HTTP status code
- *
- * @param error - The error object
- * @param context - Context for error message (e.g., 'custom field 123', 'task 456')
- */
-function logApiError(error, context) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const status = (0, errors_1.isApiError)(error) ? (error.status || error.statusCode) : undefined;
-    if (status === 401 || status === 403) {
-        core.error(`Authentication failed. Check that asana_token is valid and has access to ${context}`);
-    }
-    else if (status === 404) {
-        core.error(`${context} not found. It may have been deleted or you lack access.`);
-    }
-    else if (status === 400) {
-        core.error(`Invalid request for ${context}: ${errorMessage}. This may indicate incomplete dependencies or a bug in the action.`);
-    }
-    else {
-        core.error(`Failed operation for ${context}: ${errorMessage}`);
-    }
-}
-/**
- * Update an Asana task based on transition type (v1 compatibility)
- *
- * @param taskId - The Asana task GID
- * @param transitionType - The type of transition (ON_OPENED, ON_MERGED)
- * @param config - Action configuration
- */
-async function updateTaskStatus(taskId, transitionType, config) {
-    const stateName = (0, transition_1.mapTransitionToState)(transitionType, config);
-    if (!stateName) {
-        core.error(`Failed to map transition type ${transitionType} to state`);
-        return;
-    }
-    const markComplete = transitionType === types_1.TransitionType.ON_MERGED && config.markCompleteOnMerge;
-    try {
-        // Fetch custom field definition
-        const customField = await fetchCustomField(config.asanaToken, config.customFieldGid);
-        // Find matching enum option
-        const enumGid = findEnumOption(customField, stateName, config.customFieldGid);
-        if (!enumGid) {
-            core.error(`Cannot update task ${taskId}: state "${stateName}" not found in custom field`);
-            return;
-        }
-        // Update task
-        core.info(`Updating task ${taskId} to state "${stateName}"${markComplete ? ' and marking complete' : ''}...`);
-        await updateTask(config.asanaToken, taskId, config.customFieldGid, enumGid, markComplete);
-        core.info(`✓ Task ${taskId} successfully updated to "${stateName}"`);
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            logApiError(error, `task ${taskId}`);
-            core.debug(error.stack || 'No stack trace available');
-        }
-        else {
-            core.error(`Unexpected error updating Asana task ${taskId}: ${String(error)}`);
-        }
+function coerceFieldValue(schema, rawValue, fieldGid) {
+    switch (schema.type) {
+        case 'enum':
+            // Find matching enum option
+            const enumGid = findEnumOption(schema, rawValue, fieldGid);
+            if (!enumGid) {
+                core.error(`Cannot update field ${fieldGid}: enum option "${rawValue}" not found`);
+                return null;
+            }
+            return enumGid;
+        case 'text':
+        case 'multi_line_text':
+            // Text fields: use string as-is
+            return rawValue;
+        case 'number':
+            // Number fields: parse and validate
+            const numberValue = Number(rawValue);
+            if (isNaN(numberValue)) {
+                core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid number`);
+                return null;
+            }
+            return numberValue;
+        case 'date':
+            // Date fields: validate ISO 8601 format (YYYY-MM-DD)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+                core.error(`Cannot update field ${fieldGid}: "${rawValue}" must be YYYY-MM-DD format`);
+                return null;
+            }
+            // Validate it's an actual valid date (check if parsing changes the value)
+            const dateObj = new Date(rawValue);
+            if (isNaN(dateObj.getTime())) {
+                core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`);
+                return null;
+            }
+            const roundTrip = dateObj.toISOString().split('T')[0];
+            if (roundTrip !== rawValue) {
+                core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`);
+                return null;
+            }
+            return rawValue;
+        default:
+            core.warning(`Field ${fieldGid} has unsupported type '${schema.type}'. Skipping.`);
+            return null;
     }
 }
 /**
@@ -43263,8 +43485,6 @@ async function updateTaskStatus(taskId, transitionType, config) {
 async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
     const customFields = {};
     const shouldMarkComplete = fieldUpdates.has('__mark_complete');
-    // Cache for fetched custom field schemas
-    const fieldSchemaCache = new Map();
     // Process each field update
     for (const [fieldGid, rawValue] of fieldUpdates.entries()) {
         if (fieldGid === '__mark_complete')
@@ -43276,19 +43496,13 @@ async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
                 schema = await fetchCustomField(asanaToken, fieldGid);
                 fieldSchemaCache.set(fieldGid, schema);
             }
-            // For MVP, we only support enum fields
-            if (schema.type !== 'enum') {
-                core.warning(`Field ${fieldGid} is type '${schema.type}', not 'enum'. Only enum fields supported in MVP.`);
-                continue;
+            // Coerce the value to the appropriate type
+            const coercedValue = coerceFieldValue(schema, rawValue, fieldGid);
+            if (coercedValue === null) {
+                continue; // Skip this field if validation failed
             }
-            // Find matching enum option
-            const enumGid = findEnumOption(schema, rawValue, fieldGid);
-            if (!enumGid) {
-                core.error(`Cannot update field ${fieldGid}: value "${rawValue}" not found`);
-                continue;
-            }
-            customFields[fieldGid] = enumGid;
-            core.info(`  ✓ Field ${fieldGid} (enum): "${rawValue}" → ${enumGid}`);
+            customFields[fieldGid] = coercedValue;
+            core.info(`  ✓ Field ${fieldGid} (${schema.type}): "${rawValue}" → ${coercedValue}`);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -43362,34 +43576,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.readConfig = readConfig;
 exports.readRulesConfig = readRulesConfig;
 exports.parseRulesYAML = parseRulesYAML;
 const core = __importStar(__nccwpck_require__(7484));
 const yaml = __importStar(__nccwpck_require__(4281));
-/**
- * Read and validate action inputs from GitHub Actions context (MVP)
- * Applies default values for optional inputs
- */
-function readConfig() {
-    // Required inputs
-    const asanaToken = core.getInput('asana_token', { required: true });
-    const githubToken = core.getInput('github_token', { required: true });
-    const customFieldGid = core.getInput('custom_field_gid', { required: true });
-    // Optional inputs with defaults
-    const stateOnOpened = core.getInput('state_on_opened') || 'In Review';
-    const stateOnMerged = core.getInput('state_on_merged') || 'Shipped';
-    // Boolean inputs (default to true if not specified)
-    const markCompleteOnMerge = core.getBooleanInput('mark_complete_on_merge') !== false;
-    return {
-        asanaToken,
-        githubToken,
-        customFieldGid,
-        stateOnOpened,
-        stateOnMerged,
-        markCompleteOnMerge,
-    };
-}
 /**
  * Read rules input (for v2.0 rules engine)
  *
@@ -43460,6 +43650,137 @@ exports.ApiError = ApiError;
  */
 function isApiError(error) {
     return error instanceof ApiError;
+}
+
+
+/***/ }),
+
+/***/ 3585:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * GitHub API utilities
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fetchPRComments = fetchPRComments;
+exports.postPRComment = postPRComment;
+exports.postCommentTemplates = postCommentTemplates;
+const core = __importStar(__nccwpck_require__(7484));
+const github = __importStar(__nccwpck_require__(3228));
+/**
+ * Fetch all comments for a pull request
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ * @returns Concatenated comment bodies, or empty string on error
+ */
+async function fetchPRComments(githubToken, prNumber) {
+    try {
+        const octokit = github.getOctokit(githubToken);
+        const { owner, repo } = github.context.repo;
+        const commentsResponse = await octokit.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: prNumber,
+            per_page: 100,
+        });
+        const comments = commentsResponse.data.map(c => c.body || '').join('\n');
+        core.info(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`);
+        return comments;
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.warning(`Failed to fetch comments for PR #${prNumber}: ${errorMessage}`);
+        return ''; // Return empty string on error, don't block workflow
+    }
+}
+/**
+ * Post a comment to a pull request
+ *
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ * @param body - Comment body (markdown supported)
+ */
+async function postPRComment(githubToken, prNumber, body) {
+    try {
+        const octokit = github.getOctokit(githubToken);
+        const { owner, repo } = github.context.repo;
+        await octokit.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: prNumber,
+            body,
+        });
+        core.info(`✓ Posted comment to PR #${prNumber}`);
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        // Don't fail workflow, just log error
+        core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
+    }
+}
+/**
+ * Evaluate and post multiple comment templates to a PR
+ *
+ * @param commentTemplates - Array of Handlebars templates
+ * @param githubToken - GitHub authentication token
+ * @param prNumber - Pull request number
+ * @param commentContext - Context object for template evaluation
+ * @param evaluateTemplate - Template evaluation function
+ */
+async function postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate) {
+    if (commentTemplates.length === 0) {
+        return;
+    }
+    core.info('');
+    core.info('Posting PR comments...');
+    for (const [index, template] of commentTemplates.entries()) {
+        try {
+            const commentBody = evaluateTemplate(template, commentContext);
+            await postPRComment(githubToken, prNumber, commentBody);
+            core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.error(`Failed to process comment template ${index + 1}: ${errorMessage}`);
+            // Continue with other comments
+        }
+    }
 }
 
 
@@ -43660,47 +43981,33 @@ async function withRetry(operation, operationName) {
 
 /***/ }),
 
-/***/ 2837:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ 5127:
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 /**
- * Transition logic for determining state changes
+ * Utilities for analyzing templates in rules
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.determineTransitionType = determineTransitionType;
-exports.mapTransitionToState = mapTransitionToState;
-const types_1 = __nccwpck_require__(8522);
+exports.rulesUseHelper = rulesUseHelper;
 /**
- * Determine transition type based on PR action and merged status
+ * Check if any rule uses a specific Handlebars helper
+ *
+ * @param rules - Array of rules to analyze
+ * @param helperName - Name of the helper to search for (e.g., 'extract_from_comments')
+ * @returns true if any template uses the helper
  */
-function determineTransitionType(action, merged) {
-    if (action === 'opened') {
-        return types_1.TransitionType.ON_OPENED;
+function rulesUseHelper(rules, helperName) {
+    const pattern = new RegExp(`\\{\\{\\s*${helperName}\\s+`, 'g');
+    for (const rule of rules) {
+        for (const template of Object.values(rule.then.update_fields)) {
+            if (pattern.test(template)) {
+                return true;
+            }
+        }
     }
-    else if (action === 'edited' && !merged) {
-        return types_1.TransitionType.ON_OPENED;
-    }
-    else if (action === 'closed' && merged) {
-        return types_1.TransitionType.ON_MERGED;
-    }
-    else {
-        return null;
-    }
-}
-/**
- * Map transition type to configured state string
- */
-function mapTransitionToState(transitionType, config) {
-    switch (transitionType) {
-        case types_1.TransitionType.ON_OPENED:
-            return config.stateOnOpened;
-        case types_1.TransitionType.ON_MERGED:
-            return config.stateOnMerged;
-        default:
-            return null;
-    }
+    return false;
 }
 
 

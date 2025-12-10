@@ -1,8 +1,7 @@
 /**
- * Context builder for Handlebars templates
- * Extracts PR metadata from GitHub context for use in expressions
+ * Context types for Handlebars templates
+ * Used for template evaluation in rules engine
  */
-import * as github from '@actions/github';
 /**
  * PR context available in templates
  */
@@ -37,12 +36,6 @@ export interface HandlebarsContext {
     pr: PRContext;
     event: EventContext;
     label?: LabelContext;
+    comments?: string;
 }
-/**
- * Build Handlebars context from GitHub event payload
- *
- * @param githubContext - GitHub Actions context object (or partial for testing)
- * @returns Context object for Handlebars template evaluation
- */
-export declare function buildContext(githubContext: Pick<typeof github.context, 'eventName' | 'payload'>): HandlebarsContext;
 //# sourceMappingURL=context.d.ts.map

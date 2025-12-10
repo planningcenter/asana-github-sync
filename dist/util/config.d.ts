@@ -1,13 +1,7 @@
 /**
  * Configuration management for action inputs
  */
-import { ActionConfig } from '../types';
 import { RulesConfig } from '../rules/types';
-/**
- * Read and validate action inputs from GitHub Actions context (MVP)
- * Applies default values for optional inputs
- */
-export declare function readConfig(): ActionConfig;
 /**
  * Read rules input (for v2.0 rules engine)
  *

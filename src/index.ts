@@ -7,12 +7,22 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readRulesConfig } from './util/config';
 import { validateRulesConfig } from './rules/validator';
-import { buildRuleContext, executeRules } from './rules/engine';
+import { buildRuleContext, executeRules, buildCommentContext } from './rules/engine';
 import { extractAsanaTaskIds } from './util/parser';
-import { updateTaskFields } from './util/asana';
+import { fetchAllTaskDetails, updateAllTasks } from './util/asana';
 import { registerHelpers } from './expression/helpers';
 import { rulesUseHelper } from './util/template-analysis';
-import { fetchPRComments } from './util/github';
+import { fetchPRComments, postCommentTemplates } from './util/github';
+import { evaluateTemplate } from './expression/evaluator';
+
+/**
+ * Task details fetched from Asana
+ */
+interface TaskDetails {
+  gid: string;
+  name: string;
+  url: string;
+}
 
 async function run(): Promise<void> {
   try {
@@ -62,38 +72,57 @@ async function run(): Promise<void> {
 
     core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
 
-    // Execute rules to get field updates
-    const fieldUpdates = executeRules(rules.rules, context);
+    // Execute rules to get field updates and comment templates
+    const { fieldUpdates, commentTemplates } = executeRules(rules.rules, context);
 
-    if (fieldUpdates.size === 0) {
+    if (fieldUpdates.size === 0 && commentTemplates.length === 0) {
       core.info('No rules matched, skipping');
       return;
     }
 
     core.info(`${fieldUpdates.size} field update(s) to apply`);
+    if (commentTemplates.length > 0) {
+      core.info(`${commentTemplates.length} PR comment(s) configured`);
+    }
 
-    // Update all Asana tasks
-    let successCount = 0;
-    const failedTasks: string[] = [];
+    // Fetch task details if comment templates exist
+    let taskDetails: TaskDetails[] = [];
 
-    for (const taskId of taskIds) {
-      try {
-        await updateTaskFields(taskId, fieldUpdates, asanaToken);
-        successCount++;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        core.error(`Failed to update task ${taskId}: ${errorMessage}`);
-        failedTasks.push(taskId);
+    if (commentTemplates.length > 0) {
+      taskDetails = await fetchAllTaskDetails(taskIds, asanaToken);
+    }
+
+    // Update all Asana tasks and collect results
+    const taskResults = await updateAllTasks(
+      taskIds,
+      taskDetails,
+      fieldUpdates,
+      asanaToken
+    );
+
+    const successCount = taskResults.filter((t) => t.success).length;
+    const failedCount = taskResults.filter((t) => !t.success).length;
+
+    // Post PR comments if configured
+    if (commentTemplates.length > 0) {
+      const prNumber = github.context.payload.pull_request?.number;
+
+      if (prNumber) {
+        const commentContext = buildCommentContext(context, taskResults, fieldUpdates);
+        await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate);
+      } else {
+        core.warning('No PR number found in payload, cannot post comments');
       }
     }
 
     // Log summary
     core.info('');
     core.info(`=== Update Summary ===`);
-    core.info(`Total tasks: ${taskIds.length}`);
+    core.info(`Total tasks: ${taskResults.length}`);
     core.info(`✓ Successful: ${successCount}`);
-    if (failedTasks.length > 0) {
-      core.info(`✗ Failed: ${failedTasks.length} (${failedTasks.join(', ')})`);
+    if (failedCount > 0) {
+      const failedTaskIds = taskResults.filter((t) => !t.success).map((t) => t.gid);
+      core.info(`✗ Failed: ${failedCount} (${failedTaskIds.join(', ')})`);
     }
     core.info('');
 

@@ -172,9 +172,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('1234')).toBe('In Review');
+    expect(fieldUpdates.get('1234')).toBe('In Review');
     expect(core.info).toHaveBeenCalledWith(expect.stringContaining('Rule 0: condition matched'));
   });
 
@@ -186,9 +186,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.size).toBe(0);
+    expect(fieldUpdates.size).toBe(0);
   });
 
   test('executes multiple matching rules', () => {
@@ -203,10 +203,10 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('1234')).toBe('In Review');
-    expect(updates.get('5678')).toBe('Active');
+    expect(fieldUpdates.get('1234')).toBe('In Review');
+    expect(fieldUpdates.get('5678')).toBe('Active');
   });
 
   test('last rule wins for conflicting field', () => {
@@ -221,9 +221,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('1234')).toBe('Second');
+    expect(fieldUpdates.get('1234')).toBe('Second');
   });
 
   test('evaluates template in field value', () => {
@@ -234,9 +234,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('1234')).toBe('PR-123');
+    expect(fieldUpdates.get('1234')).toBe('PR-123');
   });
 
   test('sets mark_complete flag', () => {
@@ -247,9 +247,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('__mark_complete')).toBe('true');
+    expect(fieldUpdates.get('__mark_complete')).toBe('true');
   });
 
   test('aggregates mark_complete from any rule', () => {
@@ -264,9 +264,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('__mark_complete')).toBe('true');
+    expect(fieldUpdates.get('__mark_complete')).toBe('true');
   });
 
   test('continues on template evaluation error', () => {
@@ -277,9 +277,9 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.get('1234')).toBe('');
+    expect(fieldUpdates.get('1234')).toBe('');
     expect(core.error).toHaveBeenCalled(); // Error logged from evaluator
   });
 
@@ -291,8 +291,8 @@ describe('executeRules', () => {
       },
     ];
 
-    const updates = executeRules(rules, baseContext);
+    const { fieldUpdates } = executeRules(rules, baseContext);
 
-    expect(updates.size).toBe(0);
+    expect(fieldUpdates.size).toBe(0);
   });
 });

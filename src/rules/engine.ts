@@ -119,14 +119,23 @@ export function matchesCondition(condition: Condition, context: RuleContext): bo
 }
 
 /**
+ * Result of rule execution
+ */
+export interface RuleExecutionResult {
+  fieldUpdates: Map<string, string>; // Map of field GID → evaluated value
+  commentTemplates: string[]; // Array of PR comment templates from matching rules
+}
+
+/**
  * Execute all matching rules and collect field updates
  *
  * @param rules - Array of rules to evaluate
  * @param context - Current PR/event context (strongly typed)
- * @returns Map of field GID → evaluated value, plus special __mark_complete flag if needed
+ * @returns Field updates and comment templates from matching rules
  */
-export function executeRules(rules: Rule[], context: RuleContext): Map<string, string> {
+export function executeRules(rules: Rule[], context: RuleContext): RuleExecutionResult {
   const fieldUpdates = new Map<string, string>();
+  const commentTemplates: string[] = [];
   let shouldMarkComplete = false;
 
   for (const [index, rule] of rules.entries()) {
@@ -167,6 +176,12 @@ export function executeRules(rules: Rule[], context: RuleContext): Map<string, s
     if (rule.then.mark_complete) {
       shouldMarkComplete = true;
     }
+
+    // Collect comment template if present
+    if (rule.then.post_pr_comment) {
+      commentTemplates.push(rule.then.post_pr_comment);
+      core.info(`  Will post PR comment (template ${commentTemplates.length})`);
+    }
   }
 
   // Add special flag for task completion
@@ -174,5 +189,42 @@ export function executeRules(rules: Rule[], context: RuleContext): Map<string, s
     fieldUpdates.set('__mark_complete', 'true');
   }
 
-  return fieldUpdates;
+  return { fieldUpdates, commentTemplates };
+}
+
+/**
+ * Build Handlebars context for comment template evaluation
+ *
+ * @param ruleContext - Original rule context (PR, event data)
+ * @param taskResults - Array of task update results with success status
+ * @param fieldUpdates - Map of field updates that were applied
+ * @returns Handlebars context object for comment templates
+ */
+export function buildCommentContext(
+  ruleContext: RuleContext,
+  taskResults: Array<{ gid: string; name: string; url: string; success: boolean }>,
+  fieldUpdates: Map<string, string>
+) {
+  const successCount = taskResults.filter((t) => t.success).length;
+  const failedCount = taskResults.filter((t) => !t.success).length;
+
+  return {
+    pr: ruleContext.pr,
+    event: {
+      name: ruleContext.eventName,
+      action: ruleContext.action,
+    },
+    tasks: taskResults,
+    updates: {
+      fields: Array.from(fieldUpdates.entries())
+        .filter(([gid]) => gid !== '__mark_complete')
+        .map(([gid, value]) => ({ gid, value })),
+      mark_complete: fieldUpdates.has('__mark_complete'),
+    },
+    summary: {
+      total: taskResults.length,
+      success: successCount,
+      failed: failedCount,
+    },
+  };
 }

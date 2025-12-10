@@ -85,7 +85,7 @@ rules:
     const context = buildRuleContext(github.context);
 
     // Execute rules
-    const fieldUpdates = executeRules(rules.rules, context);
+    const { fieldUpdates } = executeRules(rules.rules, context);
 
     // Verify field updates
     expect(fieldUpdates.size).toBe(1);
@@ -121,7 +121,7 @@ rules:
     const context = buildRuleContext(mergedContext);
 
     // Execute rules
-    const fieldUpdates = executeRules(rules.rules, context);
+    const { fieldUpdates } = executeRules(rules.rules, context);
 
     // Verify field updates
     expect(fieldUpdates.size).toBe(2);
@@ -157,7 +157,7 @@ rules:
     const context = buildRuleContext(draftContext);
 
     // Execute rules
-    const fieldUpdates = executeRules(rules.rules, context);
+    const { fieldUpdates } = executeRules(rules.rules, context);
 
     // No rules should match
     expect(fieldUpdates.size).toBe(0);
@@ -189,7 +189,7 @@ rules:
     const context = buildRuleContext(github.context);
 
     // Execute rules
-    const fieldUpdates = executeRules(rules.rules, context);
+    const { fieldUpdates } = executeRules(rules.rules, context);
 
     // Verify template was evaluated
     expect(fieldUpdates.size).toBe(1);

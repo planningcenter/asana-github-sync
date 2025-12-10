@@ -30,5 +30,6 @@ export interface AsanaTask {
   gid: string;
   name: string;
   completed: boolean;
+  permalink_url?: string; // Full URL to task in Asana
   custom_fields?: Record<string, any>;
 }

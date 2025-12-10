@@ -18,6 +18,7 @@ export interface Condition {
 export interface Action {
     update_fields: Record<string, string>;
     mark_complete?: boolean;
+    post_pr_comment?: string;
 }
 /**
  * Complete rule definition
