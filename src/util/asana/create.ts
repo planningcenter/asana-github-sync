@@ -215,10 +215,10 @@ export async function attachPRViaIntegration(
     }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      core.warning('⏱️ Integration attachment timed out after 30 seconds, but task was created successfully');
+      core.warning('⏱️ Integration attachment timed out after 30 seconds, but the operation completed successfully');
     } else {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      core.warning(`❌ Integration attachment failed: ${errorMessage}, but task was created successfully`);
+      core.warning(`❌ Integration attachment failed: ${errorMessage}, but the operation completed successfully`);
     }
   } finally {
     clearTimeout(timeout);
