@@ -160,6 +160,76 @@ The integration secret is completely optional. The action works fine without it�
 **See:**
 - [Installation Guide](/guide/installation#step-2-get-asana-github-integration-secret) - Detailed setup
 
+### dry_run
+
+**Required:** No
+**Type:** Boolean (string)
+**Default:** `false`
+**Description:** Enable dry-run mode to preview what the action would do without making any changes.
+
+**Usage:**
+```yaml
+- uses: planningcenter/asana-github-sync@main
+  with:
+    dry_run: true
+```
+
+**When enabled:**
+- No changes are made to Asana (no task updates, no task creation)
+- No changes are made to GitHub (no PR comments, no PR body updates)
+- All actions that *would* be taken are logged with `[DRY RUN]` prefix
+- Perfect for testing your configuration before going live
+
+**What gets logged:**
+```
+🔍 DRY RUN MODE ENABLED - No changes will be made
+[DRY RUN] Would update task 1234567890:
+[DRY RUN]   - Field 1202887490284881: In Review
+[DRY RUN] Would create task: "Fix authentication bug"
+[DRY RUN]   - Project: 1234567890
+[DRY RUN]   - Workspace: 9876543210
+[DRY RUN] Would post comment to PR #123
+```
+
+**Common use cases:**
+- **Testing new rules** before applying them to real tasks
+- **Validating field GIDs** to ensure they match your Asana project
+- **Migration testing** when moving from manual updates to automation
+- **Debugging** rule conditions that aren't matching as expected
+
+::: tip Migration Made Easy
+When setting up the action for the first time, enable `dry_run: true` and trigger the workflow with a test PR. Review the logs to see exactly what would happen, then disable dry-run once you're confident the configuration is correct.
+:::
+
+**Example workflow for testing:**
+```yaml
+name: Asana Sync (Test)
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: planningcenter/asana-github-sync@main
+        with:
+          asana_token: ${{ secrets.ASANA_TOKEN }}
+          github_token: ${{ github.token }}
+          dry_run: true  # ← Test mode enabled
+          rules: |
+            rules:
+              - when:
+                  event: pull_request
+                  action: opened
+                then:
+                  update_fields:
+                    '1234567890': 'In Review'
+```
+
+**See:**
+- [Installation Guide](/guide/installation#step-6-test-it) - Testing setup
+
 ## Outputs
 
 Values exported after action execution.

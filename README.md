@@ -58,6 +58,7 @@ jobs:
 | `rules` | Yes | YAML rules configuration |
 | `user_mappings` | No | Map GitHub usernames to Asana user GIDs |
 | `integration_secret` | No | Asana-GitHub integration secret |
+| `dry_run` | No | Preview changes without executing (default: `false`) |
 
 [Complete input documentation →](https://planningcenter.github.io/asana-github-sync/reference/inputs-outputs)
 

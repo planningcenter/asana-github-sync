@@ -42872,7 +42872,7 @@ async function run() {
         (0, helpers_1.registerHelpers)();
         // Read and validate rules configuration
         core.info('Reading rules configuration...');
-        const { asanaToken, githubToken, rules, userMappings, integrationSecret } = (0, config_1.readRulesConfig)();
+        const { asanaToken, githubToken, rules, userMappings, integrationSecret, dryRun } = (0, config_1.readRulesConfig)();
         (0, validator_1.validateRulesConfig)(rules);
         core.info(`✓ Rules configuration loaded`);
         core.debug(`  - Asana token: ${asanaToken.substring(0, 3)}...`);
@@ -42923,19 +42923,19 @@ async function run() {
                 title: context.pr.title,
                 body: context.pr.body,
                 url: context.pr.url,
-            });
+            }, dryRun);
             const successCount = createdTasks.filter((t) => t.success).length;
             const failedCount = createdTasks.filter((t) => !t.success).length;
             // Update PR body with task links
             for (const task of createdTasks) {
                 if (task.success) {
-                    await (0, github_1.appendAsanaLinkToPR)(githubToken, prNumber, task.name, task.url);
+                    await (0, github_1.appendAsanaLinkToPR)(githubToken, prNumber, task.name, task.url, dryRun);
                 }
             }
             // Post PR comments if configured
             if (commentTemplates.length > 0) {
                 const commentContext = (0, engine_1.buildCommentContext)(context, createdTasks, fieldUpdates);
-                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
+                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate, dryRun);
             }
             // Log summary
             core.info('');
@@ -42968,7 +42968,7 @@ async function run() {
                 taskDetails = await (0, asana_1.fetchAllTaskDetails)(taskIds, asanaToken);
             }
             // Update all Asana tasks and collect results
-            const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken);
+            const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken, dryRun);
             const successCount = taskResults.filter((t) => t.success).length;
             const failedCount = taskResults.filter((t) => !t.success).length;
             // Attach PR to tasks via integration if configured
@@ -42979,7 +42979,7 @@ async function run() {
                     body: context.pr.body,
                     url: context.pr.url,
                 };
-                await (0, asana_1.attachPRToExistingTasks)(taskResults, prMetadata, asanaToken, integrationSecret);
+                await (0, asana_1.attachPRToExistingTasks)(taskResults, prMetadata, asanaToken, integrationSecret, dryRun);
             }
             else if (attachPrToTasks && !integrationSecret) {
                 core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
@@ -42989,7 +42989,7 @@ async function run() {
                 const prNumber = github.context.payload.pull_request?.number;
                 if (prNumber) {
                     const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
-                    await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate);
+                    await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate, dryRun);
                 }
                 else {
                     core.warning('No PR number found in payload, cannot post comments');
@@ -43689,9 +43689,10 @@ const fields_1 = __nccwpck_require__(836);
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret for rich PR attachment
  * @param prMetadata - PR metadata for integration attachment
+ * @param dryRun - If true, log actions without executing them
  * @returns Created task result
  */
-async function createTask(spec, asanaToken, integrationSecret, prMetadata) {
+async function createTask(spec, asanaToken, integrationSecret, prMetadata, dryRun = false) {
     const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } = spec;
     core.debug(`Creating task: "${evaluatedTitle}" in project ${action.project}...`);
     // Build task data
@@ -43739,31 +43740,71 @@ async function createTask(spec, asanaToken, integrationSecret, prMetadata) {
         }
     }
     // Create task
-    const task = await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, '/tasks', {
-        method: 'POST',
-        body: JSON.stringify({ data: taskData }),
-    }), 'create task');
-    const taskGid = task.gid;
-    const taskUrl = task.permalink_url || `https://app.asana.com/0/${action.project}/${taskGid}`;
-    core.info(`✓ Task created: ${taskGid}`);
+    let taskGid;
+    let taskUrl;
+    if (dryRun) {
+        core.info(`[DRY RUN] Would create task: "${evaluatedTitle}"`);
+        core.info(`[DRY RUN]   - Project: ${action.project}`);
+        core.info(`[DRY RUN]   - Workspace: ${action.workspace}`);
+        if (action.section) {
+            core.info(`[DRY RUN]   - Section: ${action.section}`);
+        }
+        if (evaluatedNotes) {
+            core.info(`[DRY RUN]   - Notes: ${evaluatedNotes.substring(0, 100)}${evaluatedNotes.length > 100 ? '...' : ''}`);
+        }
+        if (evaluatedHtmlNotes) {
+            core.info(`[DRY RUN]   - HTML notes: ${evaluatedHtmlNotes.substring(0, 100)}${evaluatedHtmlNotes.length > 100 ? '...' : ''}`);
+        }
+        if (evaluatedAssignee) {
+            core.info(`[DRY RUN]   - Assignee: ${evaluatedAssignee}`);
+        }
+        if (evaluatedInitialFields.size > 0) {
+            core.info(`[DRY RUN]   - Initial fields: ${evaluatedInitialFields.size} field(s)`);
+            for (const [fieldGid, value] of evaluatedInitialFields.entries()) {
+                core.info(`[DRY RUN]     - Field ${fieldGid}: ${value}`);
+            }
+        }
+        // Generate a fake task GID for dry-run
+        taskGid = `dry-run-${Date.now()}`;
+        taskUrl = `https://app.asana.com/0/${action.project}/${taskGid}`;
+    }
+    else {
+        const task = await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, '/tasks', {
+            method: 'POST',
+            body: JSON.stringify({ data: taskData }),
+        }), 'create task');
+        taskGid = task.gid;
+        taskUrl = task.permalink_url || `https://app.asana.com/0/${action.project}/${taskGid}`;
+        core.info(`✓ Task created: ${taskGid}`);
+    }
     // Always remove 'me' (the integration user) as a follower to avoid notification noise
-    try {
-        await removeTaskFollowers(taskGid, ['me'], asanaToken);
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        core.warning(`Failed to remove integration user as follower from task ${taskGid}: ${errorMessage}`);
-        // Not a critical failure
-    }
-    // Always attach PR via integration if secret is provided
-    if (integrationSecret) {
+    if (!dryRun) {
         try {
-            await attachPRViaIntegration(taskUrl, prMetadata, integrationSecret);
+            await removeTaskFollowers(taskGid, ['me'], asanaToken, dryRun);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            core.warning(`Failed to attach PR via integration: ${errorMessage}`);
+            core.warning(`Failed to remove integration user as follower from task ${taskGid}: ${errorMessage}`);
             // Not a critical failure
+        }
+    }
+    else {
+        core.info(`[DRY RUN] Would remove integration user as follower from task ${taskGid}`);
+    }
+    // Always attach PR via integration if secret is provided
+    if (integrationSecret) {
+        if (!dryRun) {
+            try {
+                await attachPRViaIntegration(taskUrl, prMetadata, integrationSecret, dryRun);
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                core.warning(`Failed to attach PR via integration: ${errorMessage}`);
+                // Not a critical failure
+            }
+        }
+        else {
+            core.info(`[DRY RUN] Would attach PR ${prMetadata.url} to task ${taskUrl} via integration`);
         }
     }
     return {
@@ -43779,16 +43820,22 @@ async function createTask(spec, asanaToken, integrationSecret, prMetadata) {
  * @param taskGid - Task GID
  * @param followers - Array of follower identifiers (e.g., ["me"])
  * @param asanaToken - Asana API token
+ * @param dryRun - If true, log actions without executing them
  */
-async function removeTaskFollowers(taskGid, followers, asanaToken) {
-    for (const follower of followers) {
-        core.debug(`Removing follower ${follower} from task ${taskGid}...`);
-        await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}/removeFollowers`, {
-            method: 'POST',
-            body: JSON.stringify({ data: { followers: [follower] } }),
-        }), `remove follower ${follower}`);
+async function removeTaskFollowers(taskGid, followers, asanaToken, dryRun = false) {
+    if (dryRun) {
+        core.info(`[DRY RUN] Would remove ${followers.length} follower(s) from task ${taskGid}: ${followers.join(', ')}`);
     }
-    core.debug(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
+    else {
+        for (const follower of followers) {
+            core.debug(`Removing follower ${follower} from task ${taskGid}...`);
+            await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}/removeFollowers`, {
+                method: 'POST',
+                body: JSON.stringify({ data: { followers: [follower] } }),
+            }), `remove follower ${follower}`);
+        }
+        core.debug(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
+    }
 }
 /**
  * Attach PR via Asana-GitHub integration for rich formatting
@@ -43796,9 +43843,17 @@ async function removeTaskFollowers(taskGid, followers, asanaToken) {
  * @param taskUrl - Task URL to attach PR to
  * @param prMetadata - PR metadata (number, title, body, url)
  * @param integrationSecret - Integration secret
+ * @param dryRun - If true, log actions without executing them
  */
-async function attachPRViaIntegration(taskUrl, prMetadata, integrationSecret) {
+async function attachPRViaIntegration(taskUrl, prMetadata, integrationSecret, dryRun = false) {
     core.debug(`Attaching PR ${prMetadata.url} to task via integration...`);
+    if (dryRun) {
+        core.info(`[DRY RUN] Would attach PR to task via integration:`);
+        core.info(`[DRY RUN]   - Task URL: ${taskUrl}`);
+        core.info(`[DRY RUN]   - PR #${prMetadata.number}: ${prMetadata.title}`);
+        core.info(`[DRY RUN]   - PR URL: ${prMetadata.url}`);
+        return;
+    }
     // Build full PR description including task link (matching reference implementation)
     const prDescription = `${prMetadata.body || ''}\n\n---\n\nAsana task: [${taskUrl}](${taskUrl})`;
     const payload = {
@@ -43849,13 +43904,14 @@ async function attachPRViaIntegration(taskUrl, prMetadata, integrationSecret) {
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret
  * @param prMetadata - PR metadata for integration attachment
+ * @param dryRun - If true, log actions without executing them
  * @returns Array of creation results with success status
  */
-async function createAllTasks(specs, asanaToken, integrationSecret, prMetadata) {
+async function createAllTasks(specs, asanaToken, integrationSecret, prMetadata, dryRun = false) {
     const results = [];
     for (const spec of specs) {
         try {
-            const result = await createTask(spec, asanaToken, integrationSecret, prMetadata);
+            const result = await createTask(spec, asanaToken, integrationSecret, prMetadata, dryRun);
             results.push(result);
         }
         catch (error) {
@@ -43879,8 +43935,9 @@ async function createAllTasks(specs, asanaToken, integrationSecret, prMetadata) 
  * @param prMetadata - PR metadata for integration attachment
  * @param asanaToken - Asana API token (for checking existing links)
  * @param integrationSecret - Integration secret for attachment
+ * @param dryRun - If true, log actions without executing them
  */
-async function attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret) {
+async function attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret, dryRun = false) {
     const { checkIfPRAlreadyLinked } = await Promise.resolve().then(() => __importStar(__nccwpck_require__(5067)));
     core.info('Attaching PR to existing Asana tasks...');
     for (const taskResult of taskResults) {
@@ -43889,10 +43946,15 @@ async function attachPRToExistingTasks(taskResults, prMetadata, asanaToken, inte
         }
         try {
             // Check if PR is already linked
-            const alreadyLinked = await checkIfPRAlreadyLinked(taskResult.gid, prMetadata.url, asanaToken);
+            const alreadyLinked = dryRun ? false : await checkIfPRAlreadyLinked(taskResult.gid, prMetadata.url, asanaToken);
             if (!alreadyLinked) {
-                await attachPRViaIntegration(taskResult.url, prMetadata, integrationSecret);
-                core.info(`✓ Attached PR to task ${taskResult.gid}`);
+                await attachPRViaIntegration(taskResult.url, prMetadata, integrationSecret, dryRun);
+                if (!dryRun) {
+                    core.info(`✓ Attached PR to task ${taskResult.gid}`);
+                }
+            }
+            else if (!dryRun) {
+                core.info(`Skipping task ${taskResult.gid} - PR already linked`);
             }
         }
         catch (error) {
@@ -44298,9 +44360,10 @@ const fields_1 = __nccwpck_require__(836);
  * @param taskDetails - Array of task details (parallel to taskIds)
  * @param fieldUpdates - Map of field updates to apply
  * @param asanaToken - Asana API token
+ * @param dryRun - If true, log actions without executing them
  * @returns Array of task results with success status
  */
-async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
+async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken, dryRun = false) {
     const results = [];
     for (let i = 0; i < taskIds.length; i++) {
         const taskId = taskIds[i];
@@ -44314,7 +44377,7 @@ async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
         };
         try {
             if (fieldUpdates.size > 0) {
-                await updateTaskFields(taskId, fieldUpdates, asanaToken);
+                await updateTaskFields(taskId, fieldUpdates, asanaToken, dryRun);
             }
             results.push({ ...details, success: true });
         }
@@ -44334,8 +44397,9 @@ async function updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken) {
  * @param taskGid - Task GID to update
  * @param fieldUpdates - Map of field GID → value (from rules engine)
  * @param asanaToken - Asana API token
+ * @param dryRun - If true, log actions without executing them
  */
-async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
+async function updateTaskFields(taskGid, fieldUpdates, asanaToken, dryRun = false) {
     const customFields = {};
     const shouldMarkComplete = fieldUpdates.has('__mark_complete');
     // Process each field update
@@ -44373,11 +44437,22 @@ async function updateTaskFields(taskGid, fieldUpdates, asanaToken) {
     }
     // Single PUT request
     core.debug(`Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`);
-    await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}`, {
-        method: 'PUT',
-        body: JSON.stringify({ data: updateData }),
-    }), `update task ${taskGid}`);
-    core.info(`✓ Task ${taskGid} successfully updated`);
+    if (dryRun) {
+        core.info(`[DRY RUN] Would update task ${taskGid}:`);
+        for (const [fieldGid, value] of Object.entries(customFields)) {
+            core.info(`[DRY RUN]   - Field ${fieldGid}: ${value}`);
+        }
+        if (shouldMarkComplete) {
+            core.info(`[DRY RUN]   - Mark as complete: true`);
+        }
+    }
+    else {
+        await (0, retry_1.withRetry)(() => (0, client_1.asanaRequest)(asanaToken, `/tasks/${taskGid}`, {
+            method: 'PUT',
+            body: JSON.stringify({ data: updateData }),
+        }), `update task ${taskGid}`);
+        core.info(`✓ Task ${taskGid} successfully updated`);
+    }
 }
 
 
@@ -44439,6 +44514,12 @@ function readRulesConfig() {
     const asanaToken = core.getInput('asana_token', { required: true });
     const githubToken = core.getInput('github_token', { required: true });
     const rulesYaml = core.getInput('rules', { required: true });
+    // Parse dry_run input (defaults to false if not provided)
+    let dryRun = false;
+    const dryRunInput = core.getInput('dry_run');
+    if (dryRunInput) {
+        dryRun = core.getBooleanInput('dry_run');
+    }
     // Parse optional user mappings (YAML or JSON string)
     const userMappingsInput = core.getInput('user_mappings');
     let userMappings = {};
@@ -44465,12 +44546,16 @@ function readRulesConfig() {
         core.info(`✓ Integration secret provided`);
     }
     const parsed = parseRulesYAML(rulesYaml);
+    if (dryRun) {
+        core.info('🔍 DRY RUN MODE ENABLED - No changes will be made');
+    }
     return {
         asanaToken,
         githubToken,
         rules: parsed,
         userMappings,
         integrationSecret,
+        dryRun,
     };
 }
 /**
@@ -44633,23 +44718,30 @@ async function fetchPRComments(githubToken, prNumber) {
  * @param githubToken - GitHub authentication token
  * @param prNumber - Pull request number
  * @param body - Comment body (markdown supported)
+ * @param dryRun - If true, log actions without executing them
  */
-async function postPRComment(githubToken, prNumber, body) {
-    try {
-        const octokit = github.getOctokit(githubToken);
-        const { owner, repo } = github.context.repo;
-        await octokit.rest.issues.createComment({
-            owner,
-            repo,
-            issue_number: prNumber,
-            body,
-        });
-        core.info(`✓ Posted comment to PR #${prNumber}`);
+async function postPRComment(githubToken, prNumber, body, dryRun = false) {
+    if (dryRun) {
+        core.info(`[DRY RUN] Would post comment to PR #${prNumber}:`);
+        core.info(`[DRY RUN] ${body.substring(0, 200)}${body.length > 200 ? '...' : ''}`);
     }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        // Don't fail workflow, just log error
-        core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
+    else {
+        try {
+            const octokit = github.getOctokit(githubToken);
+            const { owner, repo } = github.context.repo;
+            await octokit.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body,
+            });
+            core.info(`✓ Posted comment to PR #${prNumber}`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            // Don't fail workflow, just log error
+            core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
+        }
     }
 }
 /**
@@ -44660,30 +44752,36 @@ async function postPRComment(githubToken, prNumber, body) {
  * @param prNumber - Pull request number
  * @param commentContext - Context object for template evaluation
  * @param evaluateTemplate - Template evaluation function
+ * @param dryRun - If true, log actions without executing them
  */
-async function postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate) {
+async function postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate, dryRun = false) {
     if (commentTemplates.length === 0) {
         return;
     }
     core.info('');
     core.info('Posting PR comments...');
-    // Fetch existing comments once for deduplication
-    const octokit = github.getOctokit(githubToken);
-    const { owner, repo } = github.context.repo;
+    // Fetch existing comments once for deduplication (skip in dry-run)
     let existingBodies;
-    try {
-        const { data: comments } = await octokit.rest.issues.listComments({
-            owner,
-            repo,
-            issue_number: prNumber,
-        });
-        existingBodies = new Set(comments.map(c => c.body || '').filter(b => b !== ''));
-        core.debug(`Fetched ${comments.length} existing comments for deduplication`);
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`);
+    if (dryRun) {
         existingBodies = new Set();
+    }
+    else {
+        const octokit = github.getOctokit(githubToken);
+        const { owner, repo } = github.context.repo;
+        try {
+            const { data: comments } = await octokit.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: prNumber,
+            });
+            existingBodies = new Set(comments.map(c => c.body || '').filter(b => b !== ''));
+            core.debug(`Fetched ${comments.length} existing comments for deduplication`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`);
+            existingBodies = new Set();
+        }
     }
     for (const [index, template] of commentTemplates.entries()) {
         try {
@@ -44700,9 +44798,11 @@ async function postCommentTemplates(commentTemplates, githubToken, prNumber, com
                 core.debug(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
                 continue;
             }
-            await postPRComment(githubToken, prNumber, commentBody);
+            await postPRComment(githubToken, prNumber, commentBody, dryRun);
             existingBodies.add(commentBody); // Track what we posted for subsequent templates
-            core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
+            if (!dryRun) {
+                core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
+            }
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -44718,32 +44818,40 @@ async function postCommentTemplates(commentTemplates, githubToken, prNumber, com
  * @param prNumber - Pull request number
  * @param taskName - Name of created task
  * @param taskUrl - URL of created task
+ * @param dryRun - If true, log actions without executing them
  */
-async function appendAsanaLinkToPR(githubToken, prNumber, taskName, taskUrl) {
-    try {
-        const octokit = github.getOctokit(githubToken);
-        const { owner, repo } = github.context.repo;
-        // Fetch current PR data
-        const { data: pr } = await octokit.rest.pulls.get({
-            owner,
-            repo,
-            pull_number: prNumber,
-        });
-        const currentBody = pr.body || '';
-        // Append Asana link
-        const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
-        await octokit.rest.pulls.update({
-            owner,
-            repo,
-            pull_number: prNumber,
-            body: newBody,
-        });
-        core.info(`✓ Added Asana link to PR #${prNumber}`);
+async function appendAsanaLinkToPR(githubToken, prNumber, taskName, taskUrl, dryRun = false) {
+    if (dryRun) {
+        core.info(`[DRY RUN] Would append Asana link to PR #${prNumber}:`);
+        core.info(`[DRY RUN]   - Task: ${taskName}`);
+        core.info(`[DRY RUN]   - URL: ${taskUrl}`);
     }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        core.error(`Failed to update PR body: ${errorMessage}`);
-        // Don't throw - this is not critical enough to fail the workflow
+    else {
+        try {
+            const octokit = github.getOctokit(githubToken);
+            const { owner, repo } = github.context.repo;
+            // Fetch current PR data
+            const { data: pr } = await octokit.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: prNumber,
+            });
+            const currentBody = pr.body || '';
+            // Append Asana link
+            const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+            await octokit.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: prNumber,
+                body: newBody,
+            });
+            core.info(`✓ Added Asana link to PR #${prNumber}`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.error(`Failed to update PR body: ${errorMessage}`);
+            // Don't throw - this is not critical enough to fail the workflow
+        }
     }
 }
 

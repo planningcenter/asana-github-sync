@@ -18,10 +18,18 @@ export function readRulesConfig(): {
   rules: RulesConfig;
   userMappings: Record<string, string>;
   integrationSecret: string | undefined;
+  dryRun: boolean;
 } {
   const asanaToken = core.getInput('asana_token', { required: true });
   const githubToken = core.getInput('github_token', { required: true });
   const rulesYaml = core.getInput('rules', { required: true });
+
+  // Parse dry_run input (defaults to false if not provided)
+  let dryRun = false;
+  const dryRunInput = core.getInput('dry_run');
+  if (dryRunInput) {
+    dryRun = core.getBooleanInput('dry_run');
+  }
 
   // Parse optional user mappings (YAML or JSON string)
   const userMappingsInput = core.getInput('user_mappings');
@@ -51,12 +59,17 @@ export function readRulesConfig(): {
 
   const parsed = parseRulesYAML(rulesYaml);
 
+  if (dryRun) {
+    core.info('🔍 DRY RUN MODE ENABLED - No changes will be made');
+  }
+
   return {
     asanaToken,
     githubToken,
     rules: parsed,
     userMappings,
     integrationSecret,
+    dryRun,
   };
 }
 

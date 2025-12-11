@@ -195,7 +195,58 @@ rules: |
 
 ## Step 6: Test It
 
-1. Commit and push your workflow file
+Before testing with real Asana tasks, we recommend using **dry-run mode** to preview what would happen:
+
+### Option A: Test with Dry-Run Mode (Recommended)
+
+Add `dry_run: true` to your workflow to see what would happen without making any changes:
+
+```yaml
+- uses: planningcenter/asana-github-sync@main
+  with:
+    asana_token: ${{ secrets.ASANA_TOKEN }}
+    github_token: ${{ github.token }}
+    integration_secret: ${{ secrets.ASANA_GITHUB_INTEGRATION_SECRET }}
+    dry_run: true  # ← Test mode enabled
+    rules: |
+      rules:
+        - when:
+            event: pull_request
+            action: opened
+          then:
+            update_fields:
+              '1234567890': '1234567892'
+```
+
+1. Commit and push your workflow file with `dry_run: true`
+2. Open a test pull request with an Asana task URL:
+   ```markdown
+   Fixes https://app.asana.com/0/YOUR_PROJECT/YOUR_TASK
+   ```
+3. Check the Actions tab to see the dry-run logs:
+   ```
+   🔍 DRY RUN MODE ENABLED - No changes will be made
+   [DRY RUN] Would update task 1234567890:
+   [DRY RUN]   - Field 1234567890: 1234567892
+   ```
+4. Review the logs to confirm your configuration is correct
+5. **Remove `dry_run: true`** or set it to `false` to enable real updates
+
+::: tip Why Use Dry-Run?
+Dry-run mode lets you:
+- Verify your field GIDs are correct
+- Test rule conditions match as expected
+- Preview task creation without creating test tasks
+- Debug configuration issues safely
+
+Once you're confident everything looks right, disable dry-run mode.
+:::
+
+### Option B: Test with Real Updates
+
+If you prefer to test with actual Asana updates:
+
+1. Commit and push your workflow file (without `dry_run`)
 2. Open a pull request with an Asana task URL in the description:
    ```markdown
    Fixes https://app.asana.com/0/YOUR_PROJECT/YOUR_TASK

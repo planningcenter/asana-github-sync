@@ -14,6 +14,7 @@ export declare function readRulesConfig(): {
     rules: RulesConfig;
     userMappings: Record<string, string>;
     integrationSecret: string | undefined;
+    dryRun: boolean;
 };
 /**
  * Parse rules YAML string

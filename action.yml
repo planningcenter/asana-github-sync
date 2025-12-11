@@ -22,6 +22,10 @@ inputs:
   integration_secret:
     description: 'Asana-GitHub integration secret for rich PR attachments (optional)'
     required: false
+  dry_run:
+    description: 'Enable dry-run mode (logs actions without executing them)'
+    required: false
+    default: 'false'
 
 outputs:
   task_ids:

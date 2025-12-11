@@ -31,7 +31,7 @@ async function run(): Promise<void> {
 
     // Read and validate rules configuration
     core.info('Reading rules configuration...');
-    const { asanaToken, githubToken, rules, userMappings, integrationSecret } = readRulesConfig();
+    const { asanaToken, githubToken, rules, userMappings, integrationSecret, dryRun } = readRulesConfig();
 
     validateRulesConfig(rules);
 
@@ -97,7 +97,8 @@ async function run(): Promise<void> {
           title: context.pr.title,
           body: context.pr.body,
           url: context.pr.url,
-        }
+        },
+        dryRun
       );
 
       const successCount = createdTasks.filter((t) => t.success).length;
@@ -106,14 +107,14 @@ async function run(): Promise<void> {
       // Update PR body with task links
       for (const task of createdTasks) {
         if (task.success) {
-          await appendAsanaLinkToPR(githubToken, prNumber, task.name, task.url);
+          await appendAsanaLinkToPR(githubToken, prNumber, task.name, task.url, dryRun);
         }
       }
 
       // Post PR comments if configured
       if (commentTemplates.length > 0) {
         const commentContext = buildCommentContext(context, createdTasks, fieldUpdates);
-        await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate);
+        await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate, dryRun);
       }
 
       // Log summary
@@ -153,7 +154,7 @@ async function run(): Promise<void> {
       }
 
       // Update all Asana tasks and collect results
-      const taskResults = await updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken);
+      const taskResults = await updateAllTasks(taskIds, taskDetails, fieldUpdates, asanaToken, dryRun);
 
       const successCount = taskResults.filter((t) => t.success).length;
       const failedCount = taskResults.filter((t) => !t.success).length;
@@ -167,7 +168,7 @@ async function run(): Promise<void> {
           url: context.pr.url,
         };
 
-        await attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret);
+        await attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret, dryRun);
       } else if (attachPrToTasks && !integrationSecret) {
         core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
       }
@@ -178,7 +179,7 @@ async function run(): Promise<void> {
 
         if (prNumber) {
           const commentContext = buildCommentContext(context, taskResults, fieldUpdates);
-          await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate);
+          await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate, dryRun);
         } else {
           core.warning('No PR number found in payload, cannot post comments');
         }

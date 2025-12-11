@@ -42,28 +42,35 @@ export async function fetchPRComments(githubToken: string, prNumber: number): Pr
  * @param githubToken - GitHub authentication token
  * @param prNumber - Pull request number
  * @param body - Comment body (markdown supported)
+ * @param dryRun - If true, log actions without executing them
  */
 export async function postPRComment(
   githubToken: string,
   prNumber: number,
-  body: string
+  body: string,
+  dryRun = false
 ): Promise<void> {
-  try {
-    const octokit = github.getOctokit(githubToken);
-    const { owner, repo } = github.context.repo;
+  if (dryRun) {
+    core.info(`[DRY RUN] Would post comment to PR #${prNumber}:`);
+    core.info(`[DRY RUN] ${body.substring(0, 200)}${body.length > 200 ? '...' : ''}`);
+  } else {
+    try {
+      const octokit = github.getOctokit(githubToken);
+      const { owner, repo } = github.context.repo;
 
-    await octokit.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: prNumber,
-      body,
-    });
+      await octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: prNumber,
+        body,
+      });
 
-    core.info(`✓ Posted comment to PR #${prNumber}`);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    // Don't fail workflow, just log error
-    core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
+      core.info(`✓ Posted comment to PR #${prNumber}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Don't fail workflow, just log error
+      core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
+    }
   }
 }
 
@@ -75,13 +82,15 @@ export async function postPRComment(
  * @param prNumber - Pull request number
  * @param commentContext - Context object for template evaluation
  * @param evaluateTemplate - Template evaluation function
+ * @param dryRun - If true, log actions without executing them
  */
 export async function postCommentTemplates(
   commentTemplates: string[],
   githubToken: string,
   prNumber: number,
   commentContext: CommentContext,
-  evaluateTemplate: (template: string, context: HandlebarsContext | CommentContext) => string
+  evaluateTemplate: (template: string, context: HandlebarsContext | CommentContext) => string,
+  dryRun = false
 ): Promise<void> {
   if (commentTemplates.length === 0) {
     return;
@@ -90,23 +99,27 @@ export async function postCommentTemplates(
   core.info('');
   core.info('Posting PR comments...');
 
-  // Fetch existing comments once for deduplication
-  const octokit = github.getOctokit(githubToken);
-  const { owner, repo } = github.context.repo;
-
+  // Fetch existing comments once for deduplication (skip in dry-run)
   let existingBodies: Set<string>;
-  try {
-    const { data: comments } = await octokit.rest.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-    });
-    existingBodies = new Set(comments.map(c => c.body || '').filter(b => b !== ''));
-    core.debug(`Fetched ${comments.length} existing comments for deduplication`);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`);
+  if (dryRun) {
     existingBodies = new Set();
+  } else {
+    const octokit = github.getOctokit(githubToken);
+    const { owner, repo } = github.context.repo;
+
+    try {
+      const { data: comments } = await octokit.rest.issues.listComments({
+        owner,
+        repo,
+        issue_number: prNumber,
+      });
+      existingBodies = new Set(comments.map(c => c.body || '').filter(b => b !== ''));
+      core.debug(`Fetched ${comments.length} existing comments for deduplication`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`);
+      existingBodies = new Set();
+    }
   }
 
   for (const [index, template] of commentTemplates.entries()) {
@@ -127,9 +140,11 @@ export async function postCommentTemplates(
         continue;
       }
 
-      await postPRComment(githubToken, prNumber, commentBody);
+      await postPRComment(githubToken, prNumber, commentBody, dryRun);
       existingBodies.add(commentBody); // Track what we posted for subsequent templates
-      core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
+      if (!dryRun) {
+        core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       core.error(`Failed to process comment template ${index + 1}: ${errorMessage}`);
@@ -145,40 +160,48 @@ export async function postCommentTemplates(
  * @param prNumber - Pull request number
  * @param taskName - Name of created task
  * @param taskUrl - URL of created task
+ * @param dryRun - If true, log actions without executing them
  */
 export async function appendAsanaLinkToPR(
   githubToken: string,
   prNumber: number,
   taskName: string,
-  taskUrl: string
+  taskUrl: string,
+  dryRun = false
 ): Promise<void> {
-  try {
-    const octokit = github.getOctokit(githubToken);
-    const { owner, repo } = github.context.repo;
+  if (dryRun) {
+    core.info(`[DRY RUN] Would append Asana link to PR #${prNumber}:`);
+    core.info(`[DRY RUN]   - Task: ${taskName}`);
+    core.info(`[DRY RUN]   - URL: ${taskUrl}`);
+  } else {
+    try {
+      const octokit = github.getOctokit(githubToken);
+      const { owner, repo } = github.context.repo;
 
-    // Fetch current PR data
-    const { data: pr } = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: prNumber,
-    });
+      // Fetch current PR data
+      const { data: pr } = await octokit.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: prNumber,
+      });
 
-    const currentBody = pr.body || '';
+      const currentBody = pr.body || '';
 
-    // Append Asana link
-    const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+      // Append Asana link
+      const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
 
-    await octokit.rest.pulls.update({
-      owner,
-      repo,
-      pull_number: prNumber,
-      body: newBody,
-    });
+      await octokit.rest.pulls.update({
+        owner,
+        repo,
+        pull_number: prNumber,
+        body: newBody,
+      });
 
-    core.info(`✓ Added Asana link to PR #${prNumber}`);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    core.error(`Failed to update PR body: ${errorMessage}`);
-    // Don't throw - this is not critical enough to fail the workflow
+      core.info(`✓ Added Asana link to PR #${prNumber}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.error(`Failed to update PR body: ${errorMessage}`);
+      // Don't throw - this is not critical enough to fail the workflow
+    }
   }
 }

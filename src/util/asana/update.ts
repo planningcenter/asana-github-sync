@@ -26,13 +26,15 @@ export interface TaskUpdateResult {
  * @param taskDetails - Array of task details (parallel to taskIds)
  * @param fieldUpdates - Map of field updates to apply
  * @param asanaToken - Asana API token
+ * @param dryRun - If true, log actions without executing them
  * @returns Array of task results with success status
  */
 export async function updateAllTasks(
   taskIds: string[],
   taskDetails: Array<{ gid: string; name: string; url: string }>,
   fieldUpdates: Map<string, string>,
-  asanaToken: string
+  asanaToken: string,
+  dryRun = false
 ): Promise<TaskUpdateResult[]> {
   const results: TaskUpdateResult[] = [];
 
@@ -50,7 +52,7 @@ export async function updateAllTasks(
 
     try {
       if (fieldUpdates.size > 0) {
-        await updateTaskFields(taskId, fieldUpdates, asanaToken);
+        await updateTaskFields(taskId, fieldUpdates, asanaToken, dryRun);
       }
       results.push({ ...details, success: true });
     } catch (error) {
@@ -71,11 +73,13 @@ export async function updateAllTasks(
  * @param taskGid - Task GID to update
  * @param fieldUpdates - Map of field GID → value (from rules engine)
  * @param asanaToken - Asana API token
+ * @param dryRun - If true, log actions without executing them
  */
 export async function updateTaskFields(
   taskGid: string,
   fieldUpdates: Map<string, string>,
-  asanaToken: string
+  asanaToken: string,
+  dryRun = false
 ): Promise<void> {
   const customFields: Record<string, string | number> = {};
   const shouldMarkComplete = fieldUpdates.has('__mark_complete');
@@ -123,14 +127,24 @@ export async function updateTaskFields(
     `Updating task ${taskGid} (${Object.keys(customFields).length} field(s)${shouldMarkComplete ? ' + mark complete' : ''})...`
   );
 
-  await withRetry(
-    () =>
-      asanaRequest<AsanaTask>(asanaToken, `/tasks/${taskGid}`, {
-        method: 'PUT',
-        body: JSON.stringify({ data: updateData }),
-      }),
-    `update task ${taskGid}`
-  );
+  if (dryRun) {
+    core.info(`[DRY RUN] Would update task ${taskGid}:`);
+    for (const [fieldGid, value] of Object.entries(customFields)) {
+      core.info(`[DRY RUN]   - Field ${fieldGid}: ${value}`);
+    }
+    if (shouldMarkComplete) {
+      core.info(`[DRY RUN]   - Mark as complete: true`);
+    }
+  } else {
+    await withRetry(
+      () =>
+        asanaRequest<AsanaTask>(asanaToken, `/tasks/${taskGid}`, {
+          method: 'PUT',
+          body: JSON.stringify({ data: updateData }),
+        }),
+      `update task ${taskGid}`
+    );
 
-  core.info(`✓ Task ${taskGid} successfully updated`);
+    core.info(`✓ Task ${taskGid} successfully updated`);
+  }
 }

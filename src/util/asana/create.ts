@@ -36,13 +36,15 @@ export interface CreatedTaskResult {
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret for rich PR attachment
  * @param prMetadata - PR metadata for integration attachment
+ * @param dryRun - If true, log actions without executing them
  * @returns Created task result
  */
 export async function createTask(
   spec: CreateTaskSpec,
   asanaToken: string,
   integrationSecret: string | undefined,
-  prMetadata: PRMetadata
+  prMetadata: PRMetadata,
+  dryRun = false
 ): Promise<CreatedTaskResult> {
   const { action, evaluatedTitle, evaluatedNotes, evaluatedHtmlNotes, evaluatedAssignee, evaluatedInitialFields } =
     spec;
@@ -101,37 +103,75 @@ export async function createTask(
   }
 
   // Create task
-  const task = await withRetry(
-    () =>
-      asanaRequest<AsanaTask>(asanaToken, '/tasks', {
-        method: 'POST',
-        body: JSON.stringify({ data: taskData }),
-      }),
-    'create task'
-  );
+  let taskGid: string;
+  let taskUrl: string;
 
-  const taskGid = task.gid;
-  const taskUrl = task.permalink_url || `https://app.asana.com/0/${action.project}/${taskGid}`;
+  if (dryRun) {
+    core.info(`[DRY RUN] Would create task: "${evaluatedTitle}"`);
+    core.info(`[DRY RUN]   - Project: ${action.project}`);
+    core.info(`[DRY RUN]   - Workspace: ${action.workspace}`);
+    if (action.section) {
+      core.info(`[DRY RUN]   - Section: ${action.section}`);
+    }
+    if (evaluatedNotes) {
+      core.info(`[DRY RUN]   - Notes: ${evaluatedNotes.substring(0, 100)}${evaluatedNotes.length > 100 ? '...' : ''}`);
+    }
+    if (evaluatedHtmlNotes) {
+      core.info(`[DRY RUN]   - HTML notes: ${evaluatedHtmlNotes.substring(0, 100)}${evaluatedHtmlNotes.length > 100 ? '...' : ''}`);
+    }
+    if (evaluatedAssignee) {
+      core.info(`[DRY RUN]   - Assignee: ${evaluatedAssignee}`);
+    }
+    if (evaluatedInitialFields.size > 0) {
+      core.info(`[DRY RUN]   - Initial fields: ${evaluatedInitialFields.size} field(s)`);
+      for (const [fieldGid, value] of evaluatedInitialFields.entries()) {
+        core.info(`[DRY RUN]     - Field ${fieldGid}: ${value}`);
+      }
+    }
+    // Generate a fake task GID for dry-run
+    taskGid = `dry-run-${Date.now()}`;
+    taskUrl = `https://app.asana.com/0/${action.project}/${taskGid}`;
+  } else {
+    const task = await withRetry(
+      () =>
+        asanaRequest<AsanaTask>(asanaToken, '/tasks', {
+          method: 'POST',
+          body: JSON.stringify({ data: taskData }),
+        }),
+      'create task'
+    );
 
-  core.info(`✓ Task created: ${taskGid}`);
+    taskGid = task.gid;
+    taskUrl = task.permalink_url || `https://app.asana.com/0/${action.project}/${taskGid}`;
+
+    core.info(`✓ Task created: ${taskGid}`);
+  }
 
   // Always remove 'me' (the integration user) as a follower to avoid notification noise
-  try {
-    await removeTaskFollowers(taskGid, ['me'], asanaToken);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    core.warning(`Failed to remove integration user as follower from task ${taskGid}: ${errorMessage}`);
-    // Not a critical failure
+  if (!dryRun) {
+    try {
+      await removeTaskFollowers(taskGid, ['me'], asanaToken, dryRun);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.warning(`Failed to remove integration user as follower from task ${taskGid}: ${errorMessage}`);
+      // Not a critical failure
+    }
+  } else {
+    core.info(`[DRY RUN] Would remove integration user as follower from task ${taskGid}`);
   }
 
   // Always attach PR via integration if secret is provided
   if (integrationSecret) {
-    try {
-      await attachPRViaIntegration(taskUrl, prMetadata, integrationSecret);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.warning(`Failed to attach PR via integration: ${errorMessage}`);
-      // Not a critical failure
+    if (!dryRun) {
+      try {
+        await attachPRViaIntegration(taskUrl, prMetadata, integrationSecret, dryRun);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        core.warning(`Failed to attach PR via integration: ${errorMessage}`);
+        // Not a critical failure
+      }
+    } else {
+      core.info(`[DRY RUN] Would attach PR ${prMetadata.url} to task ${taskUrl} via integration`);
     }
   }
 
@@ -149,22 +189,27 @@ export async function createTask(
  * @param taskGid - Task GID
  * @param followers - Array of follower identifiers (e.g., ["me"])
  * @param asanaToken - Asana API token
+ * @param dryRun - If true, log actions without executing them
  */
-async function removeTaskFollowers(taskGid: string, followers: string[], asanaToken: string): Promise<void> {
-  for (const follower of followers) {
-    core.debug(`Removing follower ${follower} from task ${taskGid}...`);
+async function removeTaskFollowers(taskGid: string, followers: string[], asanaToken: string, dryRun = false): Promise<void> {
+  if (dryRun) {
+    core.info(`[DRY RUN] Would remove ${followers.length} follower(s) from task ${taskGid}: ${followers.join(', ')}`);
+  } else {
+    for (const follower of followers) {
+      core.debug(`Removing follower ${follower} from task ${taskGid}...`);
 
-    await withRetry(
-      () =>
-        asanaRequest(asanaToken, `/tasks/${taskGid}/removeFollowers`, {
-          method: 'POST',
-          body: JSON.stringify({ data: { followers: [follower] } }),
-        }),
-      `remove follower ${follower}`
-    );
+      await withRetry(
+        () =>
+          asanaRequest(asanaToken, `/tasks/${taskGid}/removeFollowers`, {
+            method: 'POST',
+            body: JSON.stringify({ data: { followers: [follower] } }),
+          }),
+        `remove follower ${follower}`
+      );
+    }
+
+    core.debug(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
   }
-
-  core.debug(`✓ Removed ${followers.length} follower(s) from task ${taskGid}`);
 }
 
 /**
@@ -173,13 +218,23 @@ async function removeTaskFollowers(taskGid: string, followers: string[], asanaTo
  * @param taskUrl - Task URL to attach PR to
  * @param prMetadata - PR metadata (number, title, body, url)
  * @param integrationSecret - Integration secret
+ * @param dryRun - If true, log actions without executing them
  */
 export async function attachPRViaIntegration(
   taskUrl: string,
   prMetadata: PRMetadata,
   integrationSecret: string,
+  dryRun = false
 ): Promise<void> {
   core.debug(`Attaching PR ${prMetadata.url} to task via integration...`);
+
+  if (dryRun) {
+    core.info(`[DRY RUN] Would attach PR to task via integration:`);
+    core.info(`[DRY RUN]   - Task URL: ${taskUrl}`);
+    core.info(`[DRY RUN]   - PR #${prMetadata.number}: ${prMetadata.title}`);
+    core.info(`[DRY RUN]   - PR URL: ${prMetadata.url}`);
+    return;
+  }
 
   // Build full PR description including task link (matching reference implementation)
   const prDescription = `${prMetadata.body || ''}\n\n---\n\nAsana task: [${taskUrl}](${taskUrl})`;
@@ -233,19 +288,21 @@ export async function attachPRViaIntegration(
  * @param asanaToken - Asana API token
  * @param integrationSecret - Optional integration secret
  * @param prMetadata - PR metadata for integration attachment
+ * @param dryRun - If true, log actions without executing them
  * @returns Array of creation results with success status
  */
 export async function createAllTasks(
   specs: CreateTaskSpec[],
   asanaToken: string,
   integrationSecret: string | undefined,
-  prMetadata: PRMetadata
+  prMetadata: PRMetadata,
+  dryRun = false
 ): Promise<CreatedTaskResult[]> {
   const results: CreatedTaskResult[] = [];
 
   for (const spec of specs) {
     try {
-      const result = await createTask(spec, asanaToken, integrationSecret, prMetadata);
+      const result = await createTask(spec, asanaToken, integrationSecret, prMetadata, dryRun);
       results.push(result);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -270,12 +327,14 @@ export async function createAllTasks(
  * @param prMetadata - PR metadata for integration attachment
  * @param asanaToken - Asana API token (for checking existing links)
  * @param integrationSecret - Integration secret for attachment
+ * @param dryRun - If true, log actions without executing them
  */
 export async function attachPRToExistingTasks(
   taskResults: Array<{ gid: string; name: string; url: string; success: boolean }>,
   prMetadata: PRMetadata,
   asanaToken: string,
-  integrationSecret: string
+  integrationSecret: string,
+  dryRun = false
 ): Promise<void> {
   const { checkIfPRAlreadyLinked } = await import('./tasks');
 
@@ -288,11 +347,15 @@ export async function attachPRToExistingTasks(
 
     try {
       // Check if PR is already linked
-      const alreadyLinked = await checkIfPRAlreadyLinked(taskResult.gid, prMetadata.url, asanaToken);
+      const alreadyLinked = dryRun ? false : await checkIfPRAlreadyLinked(taskResult.gid, prMetadata.url, asanaToken);
 
       if (!alreadyLinked) {
-        await attachPRViaIntegration(taskResult.url, prMetadata, integrationSecret);
-        core.info(`✓ Attached PR to task ${taskResult.gid}`);
+        await attachPRViaIntegration(taskResult.url, prMetadata, integrationSecret, dryRun);
+        if (!dryRun) {
+          core.info(`✓ Attached PR to task ${taskResult.gid}`);
+        }
+      } else if (!dryRun) {
+        core.info(`Skipping task ${taskResult.gid} - PR already linked`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
