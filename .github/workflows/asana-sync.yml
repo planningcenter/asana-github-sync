@@ -19,47 +19,40 @@ jobs:
           integration_secret: ${{ secrets.ASANA_INTEGRATION_SECRET }}
           rules: |
             rules:
-              # Create Asana task when PR opened without existing task link
+              # When PR opens or reopens → Set to "In Review" and attach PR
               - when:
                   event: pull_request
-                  action: opened
-                  has_asana_tasks: false
-                then:
-                  create_task:
-                    project: '1212291850390910'
-                    workspace: '1202585680506197'
-                    title: '{{clean_title pr.title}}'
-                    html_notes: |
-                      <body>
-                      <strong>PR:</strong> <a href="{{pr.url}}">{{pr.title}}</a>
-                      <hr />
-                      {{sanitize_markdown pr.body}}
-                      </body>
-                    initial_fields:
-                      '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
-
-              # Update existing task when PR opened and attach PR link
-              - when:
-                  event: pull_request
-                  action: opened
-                  has_asana_tasks: true
+                  action: [opened, reopened]
+                  draft: false
                 then:
                   attach_pr_to_tasks: true
                   update_fields:
-                    '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
+                    '1202887490284881': '1202887490288021'  # Status → "In Review"
 
+              # When PR is edited (e.g., Asana link added) → Set to "In Review" and attach PR
               - when:
                   event: pull_request
                   action: edited
+                  draft: false
                 then:
+                  attach_pr_to_tasks: true
                   update_fields:
-                    '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'In Review'
+                    '1202887490284881': '1202887490288021'  # Status → "In Review"
 
+              # When draft PR is marked ready for review → Set to "In Review" and attach PR
+              - when:
+                  event: pull_request
+                  action: ready_for_review
+                then:
+                  attach_pr_to_tasks: true
+                  update_fields:
+                    '1202887490284881': '1202887490288021'  # Status → "In Review"
+
+              # When PR merges → Set to "Ready"
               - when:
                   event: pull_request
                   action: closed
                   merged: true
                 then:
                   update_fields:
-                    '${{ vars.ASANA_CUSTOM_STATUS_FIELD_GID }}': 'Shipped'
-                  mark_complete: true
+                    '1202887490284881': '1202887556915715'  # Status → "Ready"
