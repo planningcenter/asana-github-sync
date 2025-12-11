@@ -27,7 +27,7 @@ jobs:
                 then:
                   attach_pr_to_tasks: true
                   update_fields:
-                    '1202887490284881': '1202887490288021'  # Status → "In Review"
+                    '1202887490284881': 'In Review'  # Status → "In Review"
 
               # When PR is edited (e.g., Asana link added) → Set to "In Review" and attach PR
               - when:
@@ -37,7 +37,7 @@ jobs:
                 then:
                   attach_pr_to_tasks: true
                   update_fields:
-                    '1202887490284881': '1202887490288021'  # Status → "In Review"
+                    '1202887490284881': 'In Review'  # Status → "In Review"
 
               # When draft PR is marked ready for review → Set to "In Review" and attach PR
               - when:
@@ -46,7 +46,7 @@ jobs:
                 then:
                   attach_pr_to_tasks: true
                   update_fields:
-                    '1202887490284881': '1202887490288021'  # Status → "In Review"
+                    '1202887490284881': 'In Review'  # Status → "In Review"
 
               # When PR merges → Set to "Ready"
               - when:
@@ -55,4 +55,4 @@ jobs:
                   merged: true
                 then:
                   update_fields:
-                    '1202887490284881': '1202887556915715'  # Status → "Ready"
+                    '1202887490284881': 'Ready'  # Status → "Ready"
