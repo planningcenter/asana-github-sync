@@ -29,7 +29,7 @@ jobs:
                   action: opened           # Specifically when opened
                 then:
                   update_fields:
-                    '1234567890': '0987654321'  # Status field → "In Review" option
+                    '1234567890': 'In Review'  # Status field → "In Review"
 ```
 
 ## How It Works
@@ -37,13 +37,17 @@ jobs:
 1. **PR Opens** - Developer creates a new PR with Asana task URL in description
 2. **Workflow Triggers** - GitHub runs the workflow on `pull_request` event
 3. **Action Finds Tasks** - Extracts Asana task URLs from PR description
-4. **Field Updates** - Sets Status field (GID `1234567890`) to "In Review" (option GID `0987654321`)
+4. **Field Updates** - Sets Status field (GID `1234567890`) to "In Review"
 
-## Finding Your GIDs
+## Finding Your Field GID
 
-### Status Field GID
+::: tip No Need for Option GIDs!
+You only need to find the **field GID** - not the option GIDs. Just use the option name (e.g., `'In Review'`) as the value.
+:::
 
-Use the Asana API to get your project's custom fields:
+### Using the Asana API
+
+Get your project's custom fields:
 
 ```bash
 curl "https://app.asana.com/api/1.0/projects/YOUR_PROJECT_GID?opt_fields=custom_field_settings.custom_field" \
@@ -57,12 +61,11 @@ Look for your Status field in the response:
   "custom_field_settings": [
     {
       "custom_field": {
-        "gid": "1234567890",  // ← This is your field GID
+        "gid": "1234567890",  // ← This is your field GID (use as key)
         "name": "Status",
         "enum_options": [
           {
-            "gid": "0987654321",  // ← This is your option GID
-            "name": "In Review"
+            "name": "In Review"  // ← Use this name as the value
           }
         ]
       }
@@ -70,6 +73,8 @@ Look for your Status field in the response:
   ]
 }
 ```
+
+Use the field GID (`1234567890`) as the key and the option name (`In Review`) as the value.
 
 ## Expected Behavior
 
@@ -86,8 +91,8 @@ Look for your Status field in the response:
 
 ```yaml
 update_fields:
-  '1234567890': '0987654321'  # Status → "In Review"
-  '1111111111': 'High'         # Priority → "High"
+  '1234567890': 'In Review'  # Status → "In Review"
+  '1111111111': 'High'        # Priority → "High"
 ```
 
 ### Include Reopened PRs
@@ -115,16 +120,20 @@ By default (when `draft` is omitted), rules match non-draft PRs only. Use `draft
 
 ### Field Not Updating
 
-**Problem:** Field GID or option GID is wrong
+**Problem:** Field GID is wrong or option name doesn't match
 
-**Solution:** Verify both GIDs using the API. For enum fields, you need the **option GID**, not the field GID.
+**Solution:** Verify the field GID using the API and ensure the option name matches exactly (case-sensitive).
 
 ```yaml
 # ❌ Wrong - using field GID as value
 update_fields:
   '1234567890': '1234567890'
 
-# ✅ Correct - using option GID as value
+# ✅ Correct - using option name as value
+update_fields:
+  '1234567890': 'In Review'
+
+# ✅ Also correct - using option GID if you prefer
 update_fields:
   '1234567890': '0987654321'
 ```

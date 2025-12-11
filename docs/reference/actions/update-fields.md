@@ -32,13 +32,13 @@ Different field types require different value formats:
 
 | Field Type | Value Format | Example |
 |------------|--------------|---------|
-| **Enum/Dropdown** | Option GID (quoted) | `'1234567890'` |
+| **Enum/Dropdown** | Option name (text) or option GID | `'In Review'` or `'1234567890'` |
 | **Text** | Plain text or template | `'In Review'` |
 | **Number** | Numeric string | `'42'` |
 | **Template** | Handlebars expression | `'{{pr.number}}'` |
 
-::: warning Important: Enum Fields
-For enum/dropdown fields, use the **option GID**, not the field name or field GID!
+::: tip Enum Fields Made Easy
+For enum/dropdown fields, you can use the **option name** (e.g., `'In Review'`) instead of looking up GIDs. The action automatically finds the matching option!
 :::
 
 ## Examples
@@ -165,24 +165,41 @@ rules:
 
 ### Enum/Dropdown Fields
 
-For status, priority, or custom dropdown fields:
+For status, priority, or custom dropdown fields, you have two options:
 
-1. Find the **field GID** from project settings
-2. Find the **option GID** for the specific value
-3. Use the **option GID** in your rules
+**Option 1: Use the option name (recommended)**
+
+The easiest approach - just use the text name of the option:
 
 ```yaml
-# ❌ Wrong - using field name
+# ✅ Recommended - use option name
 update_fields:
-  'Status': 'In Review'
+  '1234567890': 'In Review'  # Field GID → Option name
+  '1111111111': 'High'       # Priority field → option name
+```
 
-# ❌ Wrong - using field GID
-update_fields:
-  '1234567890': 'In Review'
+The action automatically looks up the correct option GID from the name.
 
-# ✅ Correct - using option GID
+**Option 2: Use the option GID (explicit)**
+
+If you prefer to be explicit or need to disambiguate:
+
+```yaml
+# ✅ Also correct - use option GID
 update_fields:
   '1234567890': '0987654321'  # Field GID → Option GID
+```
+
+**Common mistakes:**
+
+```yaml
+# ❌ Wrong - using field name as key
+update_fields:
+  'Status': 'In Review'  # Must use field GID as key
+
+# ❌ Wrong - field GID must be the key, not the value
+update_fields:
+  '1234567890': '1234567890'  # Value should be option GID or name
 ```
 
 ### Text Fields
@@ -280,16 +297,20 @@ update_fields:
   '1111111111': 'Value'
 ```
 
-### Using field GID instead of option GID for enums
+### Using field GID instead of option name/GID for enums
 
 ```yaml
 # ❌ Wrong - using field GID as value
 update_fields:
   '1234567890': '1234567890'  # This is the field GID!
 
-# ✅ Correct - use option GID as value
+# ✅ Correct - use option name
 update_fields:
-  '1234567890': '0987654321'  # This is the option GID
+  '1234567890': 'In Review'  # Option name
+
+# ✅ Also correct - use option GID
+update_fields:
+  '1234567890': '0987654321'  # Option GID
 ```
 
 ### Unquoted GIDs
@@ -304,7 +325,11 @@ update_fields:
   '1234567890': '0987654321'
 ```
 
-## Finding Field and Option GIDs
+## Finding Field GIDs
+
+::: tip You Only Need Field GIDs
+For enum/dropdown fields, you only need to find the **field GID** - not the option GIDs! Just use the option names (e.g., `'In Review'`, `'High'`) as values.
+:::
 
 ### Using Asana API
 
@@ -326,8 +351,8 @@ This returns:
         "name": "Status",
         "enum_options": [
           {
-            "gid": "0987654321",  // Option GID (use as value)
-            "name": "In Review"
+            "gid": "0987654321",  // Option GID (optional - can use name instead)
+            "name": "In Review"   // Option name (recommended)
           }
         ]
       }
@@ -336,9 +361,11 @@ This returns:
 }
 ```
 
+You can use either the option GID (`0987654321`) or the option name (`In Review`) as the value.
+
 ### Using Browser DevTools
 
-See [Finding GIDs guide](/guide/installation#step-4-find-your-asana-gids) for detailed instructions.
+See [Finding GIDs guide](/guide/installation#step-4-find-your-asana-gids) for detailed instructions on finding field GIDs.
 
 ## Common Patterns
 
