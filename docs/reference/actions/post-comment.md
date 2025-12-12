@@ -220,13 +220,13 @@ All helpers work in comments:
 
 | Helper | Purpose | Example |
 |--------|---------|---------|
-| `extract_from_body` | Extract from PR body | `{{extract_from_body "Version: ([\\d.]+)"}}` |
-| `extract_from_title` | Extract from PR title | `{{extract_from_title "\\[(\\w+)\\]"}}` |
-| `extract_from_comments` | Extract from PR comments | `{{extract_from_comments "Build #(\\d+)"}}` |
-| `clean_title` | Remove commit prefixes | `{{clean_title pr.title}}` |
-| `sanitize_markdown` | Clean markdown for display | `{{sanitize_markdown pr.body}}` |
-| `map_github_to_asana` | Map GitHub user | `{{map_github_to_asana pr.author}}` |
-| `or` | Fallback value | `{{or pr.assignee "Unassigned"}}` |
+| `extract_from_body` | Extract from PR body | `\{\{extract_from_body "Version: ([\\d.]+)"\}\}` |
+| `extract_from_title` | Extract from PR title | `\{\{extract_from_title "\\[(\\w+)\\]"\}\}` |
+| `extract_from_comments` | Extract from PR comments | `\{\{extract_from_comments "Build #(\\d+)"\}\}` |
+| `clean_title` | Remove commit prefixes | `\{\{clean_title pr.title\}\}` |
+| `sanitize_markdown` | Clean markdown for display | `\{\{sanitize_markdown pr.body\}\}` |
+| `map_github_to_asana` | Map GitHub user | `\{\{map_github_to_asana pr.author\}\}` |
+| `or` | Fallback value | `\{\{or pr.assignee "Unassigned"\}\}` |
 
 ## Comment Deduplication
 

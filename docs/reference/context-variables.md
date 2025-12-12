@@ -199,7 +199,7 @@ post_pr_comment: |
 
   **PR:** #{{pr.number}} - {{pr.title}}
   **Author:** @{{pr.author}}
-  **Branch:** `{{pr.head_ref}}` → `{{pr.base_ref}}`
+  **Branch:** `\{\{pr.head_ref\}\}` → `\{\{pr.base_ref\}\}`
   **Status:** {{#if pr.draft}}Draft{{else}}Ready for Review{{/if}}
 
   [View PR]({{pr.url}})

@@ -406,7 +406,7 @@ Store these as GitHub Secrets:
 
 ### Don't Create Secrets For
 
-- `github_token` - Use `${{ github.token }}`
+- `github_token` - Use `$\{\{ github.token \}\}`
 - `user_mappings` - Can be in workflow YAML (GIDs aren't sensitive)
 - `rules` - Configuration, not credentials
 

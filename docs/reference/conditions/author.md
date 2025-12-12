@@ -314,7 +314,7 @@ when:
 To find the exact username:
 
 1. **From PR**: Look at the PR author in GitHub UI
-2. **From API**: Use `{{pr.author}}` in a template to see the value
+2. **From API**: Use `\{\{pr.author\}\}` in a template to see the value
 3. **Test rule**: Add a debug comment to see the author:
 
 ```yaml

@@ -258,10 +258,10 @@ All GIDs must be:
 ### Template Evaluation
 
 All string fields support Handlebars templates:
-- `title`: `'{{clean_title pr.title}}'`
-- `notes`/`html_notes`: `'{{sanitize_markdown pr.body}}'`
-- `assignee`: `'{{map_github_to_asana pr.author}}'`
-- `initial_fields` values: `'{{extract_from_body "Version: ([\\d.]+)"}}'`
+- `title`: `'\{\{clean_title pr.title\}\}'`
+- `notes`/`html_notes`: `'\{\{sanitize_markdown pr.body\}\}'`
+- `assignee`: `'\{\{map_github_to_asana pr.author\}\}'`
+- `initial_fields` values: `'\{\{extract_from_body "Version: ([\\d.]+)"\}\}'`
 
 ### Section Placement
 

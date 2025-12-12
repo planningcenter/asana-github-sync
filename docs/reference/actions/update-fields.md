@@ -35,7 +35,7 @@ Different field types require different value formats:
 | **Enum/Dropdown** | Option name (text) or option GID | `'In Review'` or `'1234567890'` |
 | **Text** | Plain text or template | `'In Review'` |
 | **Number** | Numeric string | `'42'` |
-| **Template** | Handlebars expression | `'{{pr.number}}'` |
+| **Template** | Handlebars expression | `'\{\{pr.number\}\}'` |
 
 ::: tip Enum Fields Made Easy
 For enum/dropdown fields, you can use the **option name** (e.g., `'In Review'`) instead of looking up GIDs. The action automatically finds the matching option!

@@ -103,10 +103,21 @@ function isRulesConfig(value: unknown): value is RulesConfig {
 export function parseRulesYAML(yamlStr: string): RulesConfig {
   try {
     const parsed = yaml.load(yamlStr);
-    if (!isRulesConfig(parsed)) {
+
+    // Support both formats:
+    // 1. Direct array: "- when: ..." → wrap as { rules: [...] }
+    // 2. Object with rules key: "rules:\n  - when: ..." → use as-is
+    let config: unknown;
+    if (Array.isArray(parsed)) {
+      config = { rules: parsed };
+    } else {
+      config = parsed;
+    }
+
+    if (!isRulesConfig(config)) {
       throw new Error('Invalid rules configuration structure');
     }
-    return parsed;
+    return config;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid YAML: ${errorMessage}`);
