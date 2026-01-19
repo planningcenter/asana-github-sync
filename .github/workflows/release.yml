@@ -41,7 +41,7 @@ jobs:
           git push origin $MAJOR_VERSION --force
 
       - name: Create GitHub Release
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const tagName = context.ref.replace('refs/tags/', '');
