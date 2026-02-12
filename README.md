@@ -23,6 +23,9 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # For posting comments
+      contents: read        # For reading PR data
     steps:
       - uses: actions/checkout@v6
       - uses: planningcenter/asana-github-sync@main

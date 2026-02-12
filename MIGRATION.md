@@ -19,6 +19,9 @@ on:
 jobs:
   update-asana-task:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # For posting comments
+      contents: read        # For reading PR data
     steps:
       - name: Sync PR to Asana
         uses: planningcenter/asana-github-sync@main
@@ -75,6 +78,9 @@ on:
 jobs:
   update-asana-field:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # For posting comments
+      contents: read        # For reading PR data
     steps:
       - name: Sync PR to Asana
         uses: planningcenter/asana-github-sync@main
@@ -127,6 +133,9 @@ on:
 jobs:
   create-asana-task:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # For posting comments
+      contents: read        # For reading PR data
     steps:
       - name: Sync PR to Asana
         uses: planningcenter/asana-github-sync@main
@@ -212,6 +221,9 @@ on:
 jobs:
   create-asana-task:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # For posting comments
+      contents: read        # For reading PR data
     steps:
       - name: Sync PR to Asana
         uses: planningcenter/asana-github-sync@main
