@@ -10,7 +10,7 @@ import { validateRulesConfig } from './rules/validator';
 import { buildRuleContext, executeRules, buildCommentContext } from './rules/engine';
 import { extractAsanaTaskIds } from './util/parser';
 import { fetchAllTaskDetails, updateAllTasks, createAllTasks, attachPRToExistingTasks, type PRMetadata } from './util/asana';
-import { appendAsanaLinkToPR, fetchPRComments, postCommentTemplates } from './util/github';
+import { appendAsanaLinkToPR, appendAsanaLinkToIssue, fetchPRComments, postCommentTemplates } from './util/github';
 import { registerHelpers } from './expression/helpers';
 import { rulesUseHelper } from './util/template-analysis';
 import { evaluateTemplate } from './expression/evaluator';
@@ -46,32 +46,51 @@ async function run(): Promise<void> {
       core.debug(`  - Integration secret: configured`);
     }
 
+    const eventName = github.context.eventName;
+    const isPR = eventName === 'pull_request';
+    const isIssue = eventName === 'issues';
+
+    if (!isPR && !isIssue) {
+      core.warning(`Unsupported event: ${eventName}. Only pull_request and issues events are supported.`);
+      return;
+    }
+
+    // Get source number and body from the right payload
+    const sourceNumber = isPR
+      ? github.context.payload.pull_request?.number
+      : github.context.payload.issue?.number;
+    const sourceBody = isPR
+      ? (github.context.payload.pull_request?.body || '')
+      : (github.context.payload.issue?.body || '');
+
     // Check if any rule uses extract_from_comments helper
     const needsComments = rulesUseHelper(rules.rules, 'extract_from_comments');
     let comments: string | undefined;
 
     if (needsComments) {
-      core.debug('Rules use extract_from_comments, fetching PR comments...');
-      const prNumber = github.context.payload.pull_request?.number;
-
-      if (prNumber) {
-        comments = await fetchPRComments(githubToken, prNumber);
+      core.debug('Rules use extract_from_comments, fetching comments...');
+      if (sourceNumber) {
+        comments = await fetchPRComments(githubToken, sourceNumber);
       } else {
-        core.warning('No PR number found in payload, cannot fetch comments');
+        core.warning('No issue/PR number found in payload, cannot fetch comments');
         comments = '';
       }
     }
 
-    // Extract Asana task IDs from PR body to determine hasAsanaTasks
-    const prBody = github.context.payload.pull_request?.body || '';
-    const { taskIds } = extractAsanaTaskIds(prBody);
+    // Extract Asana task IDs from body to determine hasAsanaTasks
+    const { taskIds } = extractAsanaTaskIds(sourceBody);
     const hasAsanaTasks = taskIds.length > 0;
 
     // Build rule context from GitHub event
     const context = buildRuleContext(github.context, comments, hasAsanaTasks, userMappings);
 
+    const sourceLabel = isPR ? 'PR' : 'Issue';
+    const sourceNum = context.pr?.number ?? context.issue?.number ?? 0;
+    const sourceTitle = context.pr?.title ?? context.issue?.title ?? '';
+    const sourceUrl = context.pr?.url ?? context.issue?.url ?? '';
+
     core.info(`Event: ${context.eventName}, Action: ${context.action}`);
-    core.info(`PR #${context.pr.number}: ${context.pr.title}`);
+    core.info(`${sourceLabel} #${sourceNum}: ${sourceTitle}`);
     core.info(`has_asana_tasks: ${hasAsanaTasks}`);
 
     // Execute rules to get field updates, comment templates, task creation specs, and attach flag
@@ -82,21 +101,26 @@ async function run(): Promise<void> {
       // PATH A: Task Creation Mode
       core.info(`Creating ${taskCreationSpecs.length} task(s)...`);
 
-      const prNumber = github.context.payload.pull_request?.number;
-      if (!prNumber) {
-        core.error('No PR number found in payload, cannot create tasks');
+      if (!sourceNumber) {
+        core.error(`No ${sourceLabel.toLowerCase()} number found in payload, cannot create tasks`);
         return;
+      }
+
+      // Integration attachment is PR-only (Asana integration doesn't support issues)
+      const effectiveIntegrationSecret = isPR ? integrationSecret : undefined;
+      if (!isPR && integrationSecret) {
+        core.debug('Skipping integration attachment for issues event (PR-only feature)');
       }
 
       const createdTasks = await createAllTasks(
         taskCreationSpecs,
         asanaToken,
-        integrationSecret,
+        effectiveIntegrationSecret,
         {
-          number: context.pr.number,
-          title: context.pr.title,
-          body: context.pr.body,
-          url: context.pr.url,
+          number: sourceNum,
+          title: sourceTitle,
+          body: sourceBody,
+          url: sourceUrl,
         },
         dryRun
       );
@@ -104,17 +128,21 @@ async function run(): Promise<void> {
       const successCount = createdTasks.filter((t) => t.success).length;
       const failedCount = createdTasks.filter((t) => !t.success).length;
 
-      // Update PR body with task links
+      // Append task links to PR or issue body
       for (const task of createdTasks) {
         if (task.success) {
-          await appendAsanaLinkToPR(githubToken, prNumber, task.name, task.url, dryRun);
+          if (isPR) {
+            await appendAsanaLinkToPR(githubToken, sourceNumber, task.name, task.url, dryRun);
+          } else {
+            await appendAsanaLinkToIssue(githubToken, sourceNumber, task.name, task.url, dryRun);
+          }
         }
       }
 
-      // Post PR comments if configured
+      // Post comments if configured
       if (commentTemplates.length > 0) {
         const commentContext = buildCommentContext(context, createdTasks, fieldUpdates);
-        await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate, dryRun);
+        await postCommentTemplates(commentTemplates, githubToken, sourceNumber, commentContext, evaluateTemplate, dryRun);
       }
 
       // Log summary
@@ -133,7 +161,7 @@ async function run(): Promise<void> {
       core.setOutput('tasks_created', successCount.toString());
 
     } else if (taskIds.length > 0) {
-      // PATH B: Update Existing Tasks (existing logic)
+      // PATH B: Update Existing Tasks
       core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
 
       if (fieldUpdates.size === 0 && commentTemplates.length === 0) {
@@ -143,7 +171,7 @@ async function run(): Promise<void> {
 
       core.info(`${fieldUpdates.size} field update(s) to apply`);
       if (commentTemplates.length > 0) {
-        core.info(`${commentTemplates.length} PR comment(s) configured`);
+        core.info(`${commentTemplates.length} comment(s) configured`);
       }
 
       // Fetch task details if comment templates exist
@@ -159,29 +187,30 @@ async function run(): Promise<void> {
       const successCount = taskResults.filter((t) => t.success).length;
       const failedCount = taskResults.filter((t) => !t.success).length;
 
-      // Attach PR to tasks via integration if configured
-      if (attachPrToTasks && integrationSecret) {
-        const prMetadata: PRMetadata = {
-          number: context.pr.number,
-          title: context.pr.title,
-          body: context.pr.body,
-          url: context.pr.url,
-        };
-
-        await attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret, dryRun);
-      } else if (attachPrToTasks && !integrationSecret) {
-        core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
+      // Attach PR to tasks via integration if configured (PR-only)
+      if (attachPrToTasks && isPR) {
+        if (integrationSecret) {
+          const prMetadata: PRMetadata = {
+            number: sourceNum,
+            title: sourceTitle,
+            body: sourceBody,
+            url: sourceUrl,
+          };
+          await attachPRToExistingTasks(taskResults, prMetadata, asanaToken, integrationSecret, dryRun);
+        } else {
+          core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
+        }
+      } else if (attachPrToTasks && !isPR) {
+        core.warning('attach_pr_to_tasks is not supported for issues events, skipping');
       }
 
-      // Post PR comments if configured
+      // Post comments if configured
       if (commentTemplates.length > 0) {
-        const prNumber = github.context.payload.pull_request?.number;
-
-        if (prNumber) {
+        if (sourceNumber) {
           const commentContext = buildCommentContext(context, taskResults, fieldUpdates);
-          await postCommentTemplates(commentTemplates, githubToken, prNumber, commentContext, evaluateTemplate, dryRun);
+          await postCommentTemplates(commentTemplates, githubToken, sourceNumber, commentContext, evaluateTemplate, dryRun);
         } else {
-          core.warning('No PR number found in payload, cannot post comments');
+          core.warning(`No ${sourceLabel.toLowerCase()} number found in payload, cannot post comments`);
         }
       }
 
@@ -202,7 +231,7 @@ async function run(): Promise<void> {
 
     } else {
       // No tasks found and no task creation rules matched
-      core.info('No Asana task links found in PR body');
+      core.info(`No Asana task links found in ${sourceLabel.toLowerCase()} body`);
     }
 
   } catch (error) {

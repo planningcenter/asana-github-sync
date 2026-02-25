@@ -44,7 +44,7 @@ notes: 'Event: {{event.name}} - {{event.action}}'
 
 ### PR Data
 
-Available in all templates:
+Available in `pull_request` event templates:
 
 ```handlebars
 {{pr.number}}      # 123
@@ -59,16 +59,32 @@ Available in all templates:
 {{pr.head_ref}}    # "feature-branch"
 ```
 
-### Event Data
+### Issue Data
+
+Available in `issues` event templates:
 
 ```handlebars
-{{event.name}}     # "pull_request"
-{{event.action}}   # "opened"
+{{issue.number}}   # 42
+{{issue.title}}    # "Bug: login fails"
+{{issue.body}}     # Full issue description
+{{issue.author}}   # "reporter"
+{{issue.assignee}} # "maintainer" (or empty if unassigned)
+{{issue.url}}      # "https://github.com/..."
+{{issue.state}}    # "open" or "closed"
+```
+
+### Event Data
+
+Always available:
+
+```handlebars
+{{event.name}}     # "pull_request" or "issues"
+{{event.action}}   # "opened", "closed", "labeled", etc.
 ```
 
 ### Label Data
 
-Only available when `label` condition matches:
+Only available when `action: labeled` or `action: unlabeled`:
 
 ```handlebars
 {{label.name}}     # "ready-for-qa"

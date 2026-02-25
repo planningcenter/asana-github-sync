@@ -154,6 +154,55 @@ export async function postCommentTemplates(
 }
 
 /**
+ * Append Asana task link to issue body
+ *
+ * @param githubToken - GitHub authentication token
+ * @param issueNumber - Issue number
+ * @param taskName - Name of created task
+ * @param taskUrl - URL of created task
+ * @param dryRun - If true, log actions without executing them
+ */
+export async function appendAsanaLinkToIssue(
+  githubToken: string,
+  issueNumber: number,
+  taskName: string,
+  taskUrl: string,
+  dryRun = false
+): Promise<void> {
+  if (dryRun) {
+    core.info(`[DRY RUN] Would append Asana link to issue #${issueNumber}:`);
+    core.info(`[DRY RUN]   - Task: ${taskName}`);
+    core.info(`[DRY RUN]   - URL: ${taskUrl}`);
+  } else {
+    try {
+      const octokit = github.getOctokit(githubToken);
+      const { owner, repo } = github.context.repo;
+
+      const { data: issue } = await octokit.rest.issues.get({
+        owner,
+        repo,
+        issue_number: issueNumber,
+      });
+
+      const currentBody = issue.body || '';
+      const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+
+      await octokit.rest.issues.update({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        body: newBody,
+      });
+
+      core.info(`✓ Added Asana link to issue #${issueNumber}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      core.error(`Failed to update issue body: ${errorMessage}`);
+    }
+  }
+}
+
+/**
  * Append Asana task link to PR body
  *
  * @param githubToken - GitHub authentication token

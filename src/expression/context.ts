@@ -19,6 +19,20 @@ export interface PRContext {
 }
 
 /**
+ * Issue context available in templates
+ */
+export interface IssueContext {
+  number: number;
+  title: string;
+  body: string;
+  author: string;
+  assignee?: string;
+  url: string;
+  state: string;
+  labels?: string[];
+}
+
+/**
  * Event context available in templates
  */
 export interface EventContext {
@@ -37,10 +51,11 @@ export interface LabelContext {
  * Complete Handlebars context for template evaluation
  */
 export interface HandlebarsContext {
-  pr: PRContext;
+  pr?: PRContext;    // Present for pull_request events
+  issue?: IssueContext; // Present for issues events
   event: EventContext;
   label?: LabelContext;
-  comments?: string; // All PR comments concatenated (if fetched)
+  comments?: string; // All comments concatenated (if fetched)
   userMappings?: Record<string, string>; // GitHub username → Asana user GID mapping
 }
 
@@ -55,11 +70,12 @@ export interface TaskResult {
 }
 
 /**
- * Comment context for post-execution PR comment templates
+ * Comment context for post-execution PR/issue comment templates
  * Includes task results and update summary
  */
 export interface CommentContext {
-  pr: PRContext;
+  pr?: PRContext;
+  issue?: IssueContext;
   event: EventContext;
   comments?: string;
   tasks: TaskResult[];

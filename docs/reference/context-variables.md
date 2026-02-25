@@ -4,11 +4,21 @@ Template variables available in Handlebars expressions.
 
 ## Overview
 
-Context variables provide access to PR data, event information, and other runtime values. Use these in any template string throughout your rules.
+Context variables provide access to PR or issue data, event information, and other runtime values. Use these in any template string throughout your rules.
+
+The available variables depend on the event type:
+
+| Variable group | `pull_request` | `issues` |
+|----------------|:--------------:|:--------:|
+| `pr.*`         | ✅ | — |
+| `issue.*`      | — | ✅ |
+| `event.*`      | ✅ | ✅ |
+| `label.*`      | ✅ (labeled events) | ✅ (labeled events) |
+| `comments`     | ✅ (on-demand) | ✅ (on-demand) |
 
 ## pr (Pull Request)
 
-Pull request information. Always available in `pull_request` events.
+Pull request information. Available in `pull_request` events only.
 
 | Variable | Type | Description | Example |
 |----------|------|-------------|---------|
@@ -33,6 +43,37 @@ update_fields:
 post_pr_comment: |
   PR #{{pr.number}} by @{{pr.author}}
   {{pr.url}}
+```
+
+## issue (GitHub Issue)
+
+Issue information. Available in `issues` events only.
+
+| Variable | Type | Description | Example |
+|----------|------|-------------|---------|
+| `issue.number` | number | Issue number | `42` |
+| `issue.title` | string | Issue title | `"Bug: login fails"` |
+| `issue.body` | string | Issue description | Full text |
+| `issue.author` | string | Issue author username | `"reporter"` |
+| `issue.assignee` | string? | Issue assignee username (optional) | `"maintainer"` |
+| `issue.url` | string | Issue URL | `https://github.com/...` |
+| `issue.state` | string | Issue state | `"open"` / `"closed"` |
+| `issue.labels` | string[]? | All label names on the issue | `["bug", "help wanted"]` |
+
+### Examples
+
+```yaml
+create_task:
+  title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+  notes: |
+    Reported by: {{issue.author}}
+    {{issue.url}}
+
+    {{issue.body}}
+
+post_pr_comment: |
+  Issue #{{issue.number}} by @{{issue.author}}
+  {{issue.url}}
 ```
 
 ## event
@@ -68,7 +109,7 @@ post_pr_comment: |
 
 ## comments
 
-All PR comments concatenated.
+All comments (PR or issue) concatenated.
 
 ::: warning Important
 Comments are **only fetched when you use `extract_from_comments`** helper. This is the only time the `comments` variable will be available. The action fetches comments on-demand to avoid unnecessary API calls.
@@ -254,13 +295,15 @@ Use `or` helper for defaults:
 
 ### create_task
 
-All variables available:
-- `pr.*`, `event.*`, `label.*` (if applicable), `comments` (if available)
+All variables for the triggering event available:
+- PR events: `pr.*`, `event.*`, `label.*` (if applicable), `comments` (if available)
+- Issue events: `issue.*`, `event.*`, `label.*` (if applicable), `comments` (if available)
 
 ### update_fields
 
-All variables available:
-- `pr.*`, `event.*`, `label.*`, `comments`
+All variables for the triggering event available:
+- PR events: `pr.*`, `event.*`, `label.*`, `comments`
+- Issue events: `issue.*`, `event.*`, `label.*`, `comments`
 
 ### mark_complete
 
@@ -268,12 +311,12 @@ No template evaluation (boolean value only).
 
 ### post_pr_comment
 
-All variables plus task results (if using advanced templates).
+All variables plus task results (if using advanced templates). Works for both PR and issue events.
 
 ## See Also
 
 - [Template Helpers](/reference/helpers/) - Functions for working with variables
-- [extract_from_body](/reference/helpers/extraction#extract_from_body) - Extract from pr.body
-- [clean_title](/reference/helpers/text-processing#clean_title) - Clean pr.title
-- [map_github_to_asana](/reference/helpers/user-mapping) - Map pr.author
+- [extract_from_body](/reference/helpers/extraction#extract_from_body) - Extract from body (PR or issue)
+- [clean_title](/reference/helpers/text-processing#clean_title) - Clean title text
+- [map_github_to_asana](/reference/helpers/user-mapping) - Map GitHub users to Asana
 - [Template System](/concepts/templates) - Handlebars overview
