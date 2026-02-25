@@ -31,6 +31,16 @@ export declare function postPRComment(githubToken: string, prNumber: number, bod
  */
 export declare function postCommentTemplates(commentTemplates: string[], githubToken: string, prNumber: number, commentContext: CommentContext, evaluateTemplate: (template: string, context: HandlebarsContext | CommentContext) => string, dryRun?: boolean): Promise<void>;
 /**
+ * Append Asana task link to issue body
+ *
+ * @param githubToken - GitHub authentication token
+ * @param issueNumber - Issue number
+ * @param taskName - Name of created task
+ * @param taskUrl - URL of created task
+ * @param dryRun - If true, log actions without executing them
+ */
+export declare function appendAsanaLinkToIssue(githubToken: string, issueNumber: number, taskName: string, taskUrl: string, dryRun?: boolean): Promise<void>;
+/**
  * Append Asana task link to PR body
  *
  * @param githubToken - GitHub authentication token

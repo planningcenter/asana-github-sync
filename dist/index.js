@@ -42742,14 +42742,14 @@ function extractFromText(pattern, text) {
  * Call this once at startup before evaluating templates
  */
 function registerHelpers() {
-    // Helper: Extract from PR body
+    // Helper: Extract from body (PR or issue)
     handlebars_1.default.registerHelper('extract_from_body', function (pattern) {
-        const body = this.pr?.body || '';
+        const body = this.pr?.body || this.issue?.body || '';
         return extractFromText(pattern, body);
     });
-    // Helper: Extract from PR title
+    // Helper: Extract from title (PR or issue)
     handlebars_1.default.registerHelper('extract_from_title', function (pattern) {
-        const title = this.pr?.title || '';
+        const title = this.pr?.title || this.issue?.title || '';
         return extractFromText(pattern, title);
     });
     // Helper: Extract from PR comments
@@ -42884,28 +42884,44 @@ async function run() {
         if (integrationSecret) {
             core.debug(`  - Integration secret: configured`);
         }
+        const eventName = github.context.eventName;
+        const isPR = eventName === 'pull_request';
+        const isIssue = eventName === 'issues';
+        if (!isPR && !isIssue) {
+            core.warning(`Unsupported event: ${eventName}. Only pull_request and issues events are supported.`);
+            return;
+        }
+        // Get source number and body from the right payload
+        const sourceNumber = isPR
+            ? github.context.payload.pull_request?.number
+            : github.context.payload.issue?.number;
+        const sourceBody = isPR
+            ? (github.context.payload.pull_request?.body || '')
+            : (github.context.payload.issue?.body || '');
         // Check if any rule uses extract_from_comments helper
         const needsComments = (0, template_analysis_1.rulesUseHelper)(rules.rules, 'extract_from_comments');
         let comments;
         if (needsComments) {
-            core.debug('Rules use extract_from_comments, fetching PR comments...');
-            const prNumber = github.context.payload.pull_request?.number;
-            if (prNumber) {
-                comments = await (0, github_1.fetchPRComments)(githubToken, prNumber);
+            core.debug('Rules use extract_from_comments, fetching comments...');
+            if (sourceNumber) {
+                comments = await (0, github_1.fetchPRComments)(githubToken, sourceNumber);
             }
             else {
-                core.warning('No PR number found in payload, cannot fetch comments');
+                core.warning('No issue/PR number found in payload, cannot fetch comments');
                 comments = '';
             }
         }
-        // Extract Asana task IDs from PR body to determine hasAsanaTasks
-        const prBody = github.context.payload.pull_request?.body || '';
-        const { taskIds } = (0, parser_1.extractAsanaTaskIds)(prBody);
+        // Extract Asana task IDs from body to determine hasAsanaTasks
+        const { taskIds } = (0, parser_1.extractAsanaTaskIds)(sourceBody);
         const hasAsanaTasks = taskIds.length > 0;
         // Build rule context from GitHub event
         const context = (0, engine_1.buildRuleContext)(github.context, comments, hasAsanaTasks, userMappings);
+        const sourceLabel = isPR ? 'PR' : 'Issue';
+        const sourceNum = context.pr?.number ?? context.issue?.number ?? 0;
+        const sourceTitle = context.pr?.title ?? context.issue?.title ?? '';
+        const sourceUrl = context.pr?.url ?? context.issue?.url ?? '';
         core.info(`Event: ${context.eventName}, Action: ${context.action}`);
-        core.info(`PR #${context.pr.number}: ${context.pr.title}`);
+        core.info(`${sourceLabel} #${sourceNum}: ${sourceTitle}`);
         core.info(`has_asana_tasks: ${hasAsanaTasks}`);
         // Execute rules to get field updates, comment templates, task creation specs, and attach flag
         const { fieldUpdates, commentTemplates, taskCreationSpecs, attachPrToTasks } = (0, engine_1.executeRules)(rules.rules, context);
@@ -42913,29 +42929,38 @@ async function run() {
         if (taskCreationSpecs.length > 0) {
             // PATH A: Task Creation Mode
             core.info(`Creating ${taskCreationSpecs.length} task(s)...`);
-            const prNumber = github.context.payload.pull_request?.number;
-            if (!prNumber) {
-                core.error('No PR number found in payload, cannot create tasks');
+            if (!sourceNumber) {
+                core.error(`No ${sourceLabel.toLowerCase()} number found in payload, cannot create tasks`);
                 return;
             }
-            const createdTasks = await (0, asana_1.createAllTasks)(taskCreationSpecs, asanaToken, integrationSecret, {
-                number: context.pr.number,
-                title: context.pr.title,
-                body: context.pr.body,
-                url: context.pr.url,
+            // Integration attachment is PR-only (Asana integration doesn't support issues)
+            const effectiveIntegrationSecret = isPR ? integrationSecret : undefined;
+            if (!isPR && integrationSecret) {
+                core.debug('Skipping integration attachment for issues event (PR-only feature)');
+            }
+            const createdTasks = await (0, asana_1.createAllTasks)(taskCreationSpecs, asanaToken, effectiveIntegrationSecret, {
+                number: sourceNum,
+                title: sourceTitle,
+                body: sourceBody,
+                url: sourceUrl,
             }, dryRun);
             const successCount = createdTasks.filter((t) => t.success).length;
             const failedCount = createdTasks.filter((t) => !t.success).length;
-            // Update PR body with task links
+            // Append task links to PR or issue body
             for (const task of createdTasks) {
                 if (task.success) {
-                    await (0, github_1.appendAsanaLinkToPR)(githubToken, prNumber, task.name, task.url, dryRun);
+                    if (isPR) {
+                        await (0, github_1.appendAsanaLinkToPR)(githubToken, sourceNumber, task.name, task.url, dryRun);
+                    }
+                    else {
+                        await (0, github_1.appendAsanaLinkToIssue)(githubToken, sourceNumber, task.name, task.url, dryRun);
+                    }
                 }
             }
-            // Post PR comments if configured
+            // Post comments if configured
             if (commentTemplates.length > 0) {
                 const commentContext = (0, engine_1.buildCommentContext)(context, createdTasks, fieldUpdates);
-                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate, dryRun);
+                await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, sourceNumber, commentContext, evaluator_1.evaluateTemplate, dryRun);
             }
             // Log summary
             core.info('');
@@ -42952,7 +42977,7 @@ async function run() {
             core.setOutput('tasks_created', successCount.toString());
         }
         else if (taskIds.length > 0) {
-            // PATH B: Update Existing Tasks (existing logic)
+            // PATH B: Update Existing Tasks
             core.info(`Found ${taskIds.length} Asana task(s): ${taskIds.join(', ')}`);
             if (fieldUpdates.size === 0 && commentTemplates.length === 0) {
                 core.info('No rules matched, skipping');
@@ -42960,7 +42985,7 @@ async function run() {
             }
             core.info(`${fieldUpdates.size} field update(s) to apply`);
             if (commentTemplates.length > 0) {
-                core.info(`${commentTemplates.length} PR comment(s) configured`);
+                core.info(`${commentTemplates.length} comment(s) configured`);
             }
             // Fetch task details if comment templates exist
             let taskDetails = [];
@@ -42971,28 +42996,32 @@ async function run() {
             const taskResults = await (0, asana_1.updateAllTasks)(taskIds, taskDetails, fieldUpdates, asanaToken, dryRun);
             const successCount = taskResults.filter((t) => t.success).length;
             const failedCount = taskResults.filter((t) => !t.success).length;
-            // Attach PR to tasks via integration if configured
-            if (attachPrToTasks && integrationSecret) {
-                const prMetadata = {
-                    number: context.pr.number,
-                    title: context.pr.title,
-                    body: context.pr.body,
-                    url: context.pr.url,
-                };
-                await (0, asana_1.attachPRToExistingTasks)(taskResults, prMetadata, asanaToken, integrationSecret, dryRun);
-            }
-            else if (attachPrToTasks && !integrationSecret) {
-                core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
-            }
-            // Post PR comments if configured
-            if (commentTemplates.length > 0) {
-                const prNumber = github.context.payload.pull_request?.number;
-                if (prNumber) {
-                    const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
-                    await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, prNumber, commentContext, evaluator_1.evaluateTemplate, dryRun);
+            // Attach PR to tasks via integration if configured (PR-only)
+            if (attachPrToTasks && isPR) {
+                if (integrationSecret) {
+                    const prMetadata = {
+                        number: sourceNum,
+                        title: sourceTitle,
+                        body: sourceBody,
+                        url: sourceUrl,
+                    };
+                    await (0, asana_1.attachPRToExistingTasks)(taskResults, prMetadata, asanaToken, integrationSecret, dryRun);
                 }
                 else {
-                    core.warning('No PR number found in payload, cannot post comments');
+                    core.warning('attach_pr_to_tasks is true but integration_secret is not configured, skipping');
+                }
+            }
+            else if (attachPrToTasks && !isPR) {
+                core.warning('attach_pr_to_tasks is not supported for issues events, skipping');
+            }
+            // Post comments if configured
+            if (commentTemplates.length > 0) {
+                if (sourceNumber) {
+                    const commentContext = (0, engine_1.buildCommentContext)(context, taskResults, fieldUpdates);
+                    await (0, github_1.postCommentTemplates)(commentTemplates, githubToken, sourceNumber, commentContext, evaluator_1.evaluateTemplate, dryRun);
+                }
+                else {
+                    core.warning(`No ${sourceLabel.toLowerCase()} number found in payload, cannot post comments`);
                 }
             }
             // Log summary
@@ -43011,7 +43040,7 @@ async function run() {
         }
         else {
             // No tasks found and no task creation rules matched
-            core.info('No Asana task links found in PR body');
+            core.info(`No Asana task links found in ${sourceLabel.toLowerCase()} body`);
         }
     }
     catch (error) {
@@ -43082,42 +43111,65 @@ const evaluator_1 = __nccwpck_require__(5851);
  * Build rule context from GitHub context
  *
  * @param githubContext - GitHub Actions context
- * @param comments - Optional PR comments (pre-fetched if needed by caller)
- * @param hasAsanaTasks - Whether PR body contains Asana task links
+ * @param comments - Optional comments (pre-fetched if needed by caller)
+ * @param hasAsanaTasks - Whether the body contains Asana task links
  * @param userMappings - Optional GitHub username → Asana user GID mapping
  * @returns Strongly-typed context for rules engine
  */
 function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) {
     const { eventName, payload } = githubContext;
-    const pr = payload.pull_request;
-    if (!pr) {
-        throw new Error('No pull_request in GitHub payload');
-    }
     const context = {
         eventName,
         action: payload.action || '',
-        pr: {
+        hasAsanaTasks,
+    };
+    if (eventName === 'pull_request') {
+        const pr = payload.pull_request;
+        if (!pr) {
+            throw new Error('No pull_request in GitHub payload');
+        }
+        context.pr = {
             number: pr.number,
             title: pr.title,
             body: pr.body || '',
             merged: pr.merged || false,
             draft: pr.draft || false,
             author: pr.user.login,
-            assignee: pr.assignee?.login, // Optional: may be undefined
+            assignee: pr.assignee?.login,
             base_ref: pr.base.ref,
             head_ref: pr.head.ref,
             url: pr.html_url || '',
-        },
-        hasAsanaTasks,
-    };
-    if (payload.label) {
-        context.label = {
-            name: payload.label.name,
         };
+        if (payload.label) {
+            context.label = { name: payload.label.name };
+        }
+        if (pr.labels && Array.isArray(pr.labels)) {
+            context.labels = pr.labels.map((label) => label.name);
+        }
     }
-    // Extract all label names from PR (if present)
-    if (pr.labels && Array.isArray(pr.labels)) {
-        context.labels = pr.labels.map((label) => label.name);
+    else if (eventName === 'issues') {
+        const issue = payload.issue;
+        if (!issue) {
+            throw new Error('No issue in GitHub payload');
+        }
+        context.issue = {
+            number: issue.number,
+            title: issue.title,
+            body: issue.body || '',
+            author: issue.user.login,
+            assignee: issue.assignee?.login,
+            url: issue.html_url || '',
+            state: issue.state || 'open',
+        };
+        if (payload.label) {
+            context.label = { name: payload.label.name };
+        }
+        if (issue.labels && Array.isArray(issue.labels)) {
+            context.labels = issue.labels.map((label) => label.name);
+        }
+    }
+    else {
+        throw new Error(`Unsupported event: ${eventName}. Supported events: pull_request, issues`);
     }
     if (comments !== undefined) {
         context.comments = comments;
@@ -43146,13 +43198,17 @@ function matchesCondition(condition, context) {
             return false;
         }
     }
-    // Merged (if specified) must match
-    if (condition.merged !== undefined && condition.merged !== context.pr.merged) {
-        return false;
+    // Merged (if specified) - only applies to pull_request events
+    if (condition.merged !== undefined) {
+        if (!context.pr || condition.merged !== context.pr.merged) {
+            return false;
+        }
     }
-    // Draft (if specified) must match
-    if (condition.draft !== undefined && condition.draft !== context.pr.draft) {
-        return false;
+    // Draft (if specified) - only applies to pull_request events
+    if (condition.draft !== undefined) {
+        if (!context.pr || condition.draft !== context.pr.draft) {
+            return false;
+        }
     }
     // Label (if specified) must match
     if (condition.label !== undefined) {
@@ -43177,10 +43233,11 @@ function matchesCondition(condition, context) {
             return false;
         }
     }
-    // Author (if specified) must match
+    // Author (if specified) must match - works for both PR and issue events
     if (condition.author !== undefined) {
         const authors = Array.isArray(condition.author) ? condition.author : [condition.author];
-        if (!authors.includes(context.pr.author)) {
+        const author = context.pr?.author || context.issue?.author || '';
+        if (!authors.includes(author)) {
             return false;
         }
     }
@@ -43208,6 +43265,7 @@ function executeRules(rules, context) {
         // Convert to Handlebars context for template evaluation
         const handlebarsContext = {
             pr: context.pr,
+            issue: context.issue,
             event: {
                 name: context.eventName,
                 action: context.action,
@@ -43346,6 +43404,7 @@ function buildCommentContext(ruleContext, taskResults, fieldUpdates) {
     const failedCount = taskResults.filter((t) => !t.success).length;
     return {
         pr: ruleContext.pr,
+        issue: ruleContext.issue,
         event: {
             name: ruleContext.eventName,
             action: ruleContext.action,
@@ -44586,10 +44645,20 @@ function isRulesConfig(value) {
 function parseRulesYAML(yamlStr) {
     try {
         const parsed = yaml.load(yamlStr);
-        if (!isRulesConfig(parsed)) {
+        // Support both formats:
+        // 1. Direct array: "- when: ..." → wrap as { rules: [...] }
+        // 2. Object with rules key: "rules:\n  - when: ..." → use as-is
+        let config;
+        if (Array.isArray(parsed)) {
+            config = { rules: parsed };
+        }
+        else {
+            config = parsed;
+        }
+        if (!isRulesConfig(config)) {
             throw new Error('Invalid rules configuration structure');
         }
-        return parsed;
+        return config;
     }
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -44682,6 +44751,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.fetchPRComments = fetchPRComments;
 exports.postPRComment = postPRComment;
 exports.postCommentTemplates = postCommentTemplates;
+exports.appendAsanaLinkToIssue = appendAsanaLinkToIssue;
 exports.appendAsanaLinkToPR = appendAsanaLinkToPR;
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
@@ -44808,6 +44878,46 @@ async function postCommentTemplates(commentTemplates, githubToken, prNumber, com
             const errorMessage = error instanceof Error ? error.message : String(error);
             core.error(`Failed to process comment template ${index + 1}: ${errorMessage}`);
             // Continue with other comments
+        }
+    }
+}
+/**
+ * Append Asana task link to issue body
+ *
+ * @param githubToken - GitHub authentication token
+ * @param issueNumber - Issue number
+ * @param taskName - Name of created task
+ * @param taskUrl - URL of created task
+ * @param dryRun - If true, log actions without executing them
+ */
+async function appendAsanaLinkToIssue(githubToken, issueNumber, taskName, taskUrl, dryRun = false) {
+    if (dryRun) {
+        core.info(`[DRY RUN] Would append Asana link to issue #${issueNumber}:`);
+        core.info(`[DRY RUN]   - Task: ${taskName}`);
+        core.info(`[DRY RUN]   - URL: ${taskUrl}`);
+    }
+    else {
+        try {
+            const octokit = github.getOctokit(githubToken);
+            const { owner, repo } = github.context.repo;
+            const { data: issue } = await octokit.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber,
+            });
+            const currentBody = issue.body || '';
+            const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+            await octokit.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: newBody,
+            });
+            core.info(`✓ Added Asana link to issue #${issueNumber}`);
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.error(`Failed to update issue body: ${errorMessage}`);
         }
     }
 }

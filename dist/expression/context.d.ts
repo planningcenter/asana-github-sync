@@ -17,6 +17,19 @@ export interface PRContext {
     url: string;
 }
 /**
+ * Issue context available in templates
+ */
+export interface IssueContext {
+    number: number;
+    title: string;
+    body: string;
+    author: string;
+    assignee?: string;
+    url: string;
+    state: string;
+    labels?: string[];
+}
+/**
  * Event context available in templates
  */
 export interface EventContext {
@@ -33,7 +46,8 @@ export interface LabelContext {
  * Complete Handlebars context for template evaluation
  */
 export interface HandlebarsContext {
-    pr: PRContext;
+    pr?: PRContext;
+    issue?: IssueContext;
     event: EventContext;
     label?: LabelContext;
     comments?: string;
@@ -49,11 +63,12 @@ export interface TaskResult {
     success: boolean;
 }
 /**
- * Comment context for post-execution PR comment templates
+ * Comment context for post-execution PR/issue comment templates
  * Includes task results and update summary
  */
 export interface CommentContext {
-    pr: PRContext;
+    pr?: PRContext;
+    issue?: IssueContext;
     event: EventContext;
     comments?: string;
     tasks: TaskResult[];
