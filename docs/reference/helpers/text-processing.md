@@ -4,7 +4,7 @@ Clean and format text for Asana tasks.
 
 ## Overview
 
-Text processing helpers transform PR content to make it suitable for Asana. This includes removing conventional commit prefixes and cleaning markdown that doesn't render well in Asana.
+Text processing helpers transform PR content to make it suitable for Asana. This includes removing conventional commit prefixes, cleaning markdown, and converting markdown to HTML for rich formatting in Asana tasks.
 
 ## Helpers
 
@@ -32,9 +32,54 @@ create_task:
   title: '{{clean_title pr.title}}'
 ```
 
+### markdown_to_html
+
+Convert markdown to HTML for use in Asana's `html_notes` field.
+
+**Syntax:**
+```handlebars
+{{markdown_to_html text}}
+```
+
+**Parameters:**
+- `text` - The markdown text to convert
+
+**Returns:** HTML string suitable for Asana `html_notes`
+
+**Converts:**
+- Headings (`#`, `##`) → `<h1>`, `<h2>` (h3–h6 downgraded to `<h2>`)
+- Bold/italic/strikethrough → `<strong>`, `<em>`, `<s>`
+- Unordered/ordered lists → `<ul>`/`<ol>` with `<li>`
+- Links → `<a href="...">`
+- Code blocks and inline code → `<pre><code>`, `<code>`
+- Blockquotes → `<blockquote>`
+- Horizontal rules → `<hr>`
+- Tables → `<table>/<tr>/<td>` (normalizes away `<thead>`, `<tbody>`, `<th>`)
+
+**Strips (unsupported by Asana):**
+- Images (`![alt](url)` and linked images)
+- HTML comments (`[//]: # (...)`)
+- Raw HTML tags in the input (e.g. `<script>`, event handler attributes) — only markdown-generated HTML is emitted
+- `class` attributes (e.g. syntax highlighting classes)
+
+**Unwraps (tags removed, content preserved):**
+- `<details>` / `<summary>` — collapse behavior is lost but the text is kept
+
+**Example:**
+```yaml
+create_task:
+  html_notes: '<body>{{markdown_to_html pr.body}}</body>'
+```
+
+::: warning Body wrapper required
+Asana requires `html_notes` to be wrapped in `<body>` tags. The helper returns the inner HTML content only — you must wrap it yourself.
+:::
+
+---
+
 ### sanitize_markdown
 
-Clean markdown for Asana's text rendering.
+Clean markdown for Asana's plain text rendering.
 
 **Syntax:**
 ```handlebars
@@ -92,6 +137,131 @@ Output: "Fix button alignment"
 Input:  "Update README"
 Output: "Update README"
 ```
+
+### markdown_to_html
+
+#### Headings
+
+h1 and h2 pass through unchanged. h3–h6 are downgraded to h2 since Asana only supports those two levels.
+
+```handlebars
+Input:  "# Title"
+Output: "<h1>Title</h1>"
+
+Input:  "## Section"
+Output: "<h2>Section</h2>"
+
+Input:  "### Subsection"
+Output: "<h2>Subsection</h2>"
+
+Input:  "#### Deep"
+Output: "<h2>Deep</h2>"
+```
+
+#### Inline Formatting
+
+```handlebars
+Input:  "**bold** and _italic_"
+Output: "<p><strong>bold</strong> and <em>italic</em></p>"
+
+Input:  "~~strikethrough~~"
+Output: "<p><s>strikethrough</s></p>"
+```
+
+#### Lists
+
+```handlebars
+Input:  "- item 1\n- item 2"
+Output: "<ul>\n<li>item 1</li>\n<li>item 2</li>\n</ul>"
+
+Input:  "1. first\n2. second"
+Output: "<ol>\n<li>first</li>\n<li>second</li>\n</ol>"
+```
+
+#### Links
+
+```handlebars
+Input:  "[View PR](https://github.com/org/repo/pull/1)"
+Output: '<p><a href="https://github.com/org/repo/pull/1">View PR</a></p>'
+```
+
+#### Code
+
+The `class` attribute (added by marked for syntax highlighting) is stripped since Asana doesn't use it.
+
+```handlebars
+Input:  "`inline code`"
+Output: "<p><code>inline code</code></p>"
+
+Input:  "```js\nconsole.log('hi');\n```"
+Output: "<pre><code>console.log('hi');\n</code></pre>"
+```
+
+#### Tables
+
+`<thead>`, `<tbody>`, and `<th>` are normalized to the subset Asana supports (`<table>`, `<tr>`, `<td>`).
+
+```handlebars
+Input:
+  | Name  | Status |
+  |-------|--------|
+  | Auth  | Done   |
+
+Output:
+  <table>
+  <tr>
+  <td>Name</td>
+  <td>Status</td>
+  </tr>
+  <tr>
+  <td>Auth</td>
+  <td>Done</td>
+  </tr>
+  </table>
+```
+
+#### Images
+
+Images are stripped — Asana's `html_notes` only supports images attached to the task, not external URLs.
+
+```handlebars
+Input:  "![screenshot](https://example.com/img.png)"
+Output: ""
+
+Input:  "[![badge](https://img.shields.io/badge.svg)](https://example.com)"
+Output: ""
+```
+
+#### details blocks
+
+The `<details>` and `<summary>` tags are removed but their text content is preserved — collapse behavior is lost but nothing is dropped.
+
+```handlebars
+Input:
+  <details>
+  <summary>Full error log</summary>
+  Error: something went wrong at line 42
+  </details>
+
+Output:
+  <p>Full error log
+  Error: something went wrong at line 42</p>
+```
+
+#### HTML comments
+
+```handlebars
+Input:  "[//]: # (reviewer: please check the auth logic)"
+Output: ""
+```
+
+#### Empty input
+
+```handlebars
+{{markdown_to_html ""}}  # Returns: ""
+```
+
+---
 
 ### sanitize_markdown
 
@@ -182,17 +352,14 @@ rules:
         Task created: {{clean_title pr.title}}
 ```
 
-### Preserve Original in HTML Notes
+### Rich HTML Notes from PR Body
 
-Keep full formatting in HTML:
+Use `markdown_to_html` to get full rich text rendering in Asana:
 
 ```yaml
 create_task:
   title: '{{clean_title pr.title}}'
-  html_notes: |
-    <strong>{{pr.title}}</strong>
-    <br><br>
-    {{sanitize_markdown pr.body}}
+  html_notes: '<body>{{markdown_to_html pr.body}}</body>'
 ```
 
 ## Why Use These Helpers?
@@ -256,11 +423,12 @@ create_task:
 
 ### Empty Input
 
-Both helpers handle empty input gracefully:
+All helpers handle empty input gracefully:
 
 ```handlebars
-{{clean_title ""}}        # Returns: ""
-{{sanitize_markdown ""}}  # Returns: ""
+{{clean_title ""}}         # Returns: ""
+{{sanitize_markdown ""}}   # Returns: ""
+{{markdown_to_html ""}}    # Returns: ""
 ```
 
 ### Already Clean
@@ -280,30 +448,40 @@ Input:  "feat: fix: Something"
 Output: "fix: Something"
 ```
 
-## HTML Notes Alternative
+## notes vs html_notes
 
-For rich formatting, use `html_notes` instead of `notes`:
+Use `notes` with `sanitize_markdown` for plain text, or `html_notes` with `markdown_to_html` for rich formatting:
+
+```yaml
+# Plain text — headings and lists show as raw markdown
+create_task:
+  notes: '{{sanitize_markdown pr.body}}'
+```
+
+```yaml
+# Rich text — headings, lists, tables, and links render properly in Asana
+create_task:
+  html_notes: '<body>{{markdown_to_html pr.body}}</body>'
+```
+
+You can also mix static HTML with the helper output:
 
 ```yaml
 create_task:
-  title: '{{clean_title pr.title}}'
   html_notes: |
-    <strong>PR Description</strong>
-    <br><br>
-    {{sanitize_markdown pr.body}}
-    <br><br>
+    <body>
+    {{markdown_to_html pr.body}}
+    <hr/>
     <a href="{{pr.url}}">View PR #{{pr.number}}</a>
+    </body>
 ```
-
-This gives you more control over formatting while still cleaning the markdown.
 
 ## Performance
 
-Both helpers are fast:
-- `clean_title`: Simple regex replacement
+All helpers are fast:
+- `clean_title`: Single regex replacement
 - `sanitize_markdown`: Multiple regex passes, but optimized
-
-No noticeable performance impact even with large PR descriptions.
+- `markdown_to_html`: Markdown parse + regex post-processing; negligible overhead even for large PR descriptions
 
 ## See Also
 
