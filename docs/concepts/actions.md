@@ -137,7 +137,7 @@ See [mark_complete reference](/reference/actions/mark-complete).
 
 ## attach_pr_to_tasks
 
-Link PR to Asana tasks via GitHub integration.
+Link PR to Asana tasks via GitHub integration. **Pull request events only.**
 
 ### Basic Usage
 
@@ -166,6 +166,10 @@ Requires `integration_secret` input configured:
     github_token: ${{ github.token }}
     integration_secret: ${{ secrets.ASANA_INTEGRATION_SECRET }}
 ```
+
+::: warning PR only
+`attach_pr_to_tasks` is not supported for `issues` events. The Asana-GitHub integration is PR-specific. Using it in an issue rule logs a warning and skips the attachment.
+:::
 
 Creates integration attachment with live PR status in Asana. Automatically deduplicates.
 
@@ -214,9 +218,9 @@ See [post_pr_comment reference](/reference/actions/post-comment).
 
 ## create_task
 
-Create new Asana task (requires `has_asana_tasks: false`).
+Create new Asana task (requires `has_asana_tasks: false`). Works for both `pull_request` and `issues` events.
 
-### Minimal
+### From a PR
 
 ```yaml
 when:
@@ -229,7 +233,22 @@ then:
     title: '{{pr.title}}'
 ```
 
-### Complete
+### From a GitHub Issue
+
+```yaml
+when:
+  event: issues
+  action: opened
+  has_asana_tasks: false
+then:
+  create_task:
+    project: '1234567890'
+    workspace: '0987654321'
+    title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+    notes: '{{issue.body}}'
+```
+
+### Complete (PR)
 
 ```yaml
 then:
@@ -319,8 +338,9 @@ then:
 
 ### Available Context
 
-- **pr.*** - PR data (number, title, body, author, etc.)
-- **event.*** - Event data (name, action)
+- **pr.*** - PR data (number, title, body, author, etc.) — `pull_request` events only
+- **issue.*** - Issue data (number, title, body, author, etc.) — `issues` events only
+- **event.*** - Event data (name, action) — always available
 - **label.*** - Label data (when label condition matches)
 - **tasks*** - Task data (in post_pr_comment only)
 - **summary.*** - Summary data (in post_pr_comment only)

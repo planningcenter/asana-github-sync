@@ -1,6 +1,6 @@
 # Conditions
 
-When rules trigger based on GitHub events and PR state.
+When rules trigger based on GitHub events and PR or issue state.
 
 ## Overview
 
@@ -10,8 +10,8 @@ Conditions define when a rule should execute. They appear in the `when` block an
 when:
   event: pull_request      # Required
   action: opened           # Optional
-  merged: true             # Optional
-  draft: false             # Optional
+  merged: true             # Optional (PR only)
+  draft: false             # Optional (PR only)
   # All must match
 ```
 
@@ -54,7 +54,7 @@ See [action reference](/reference/conditions/action).
 
 ### merged
 
-Filter by merge status:
+Filter by PR merge status. **Pull request events only** — never matches for `issues` events.
 
 ```yaml
 when:
@@ -74,7 +74,7 @@ See [merged reference](/reference/conditions/merged).
 
 ### draft
 
-Filter by draft status:
+Filter by PR draft status. **Pull request events only** — never matches for `issues` events.
 
 ```yaml
 when:
@@ -128,12 +128,18 @@ See [has_asana_tasks reference](/reference/conditions/has-asana-tasks).
 
 ### author
 
-Filter by PR author username:
+Filter by author username. Works for both PR and issue events.
 
 ```yaml
 when:
   event: pull_request
   author: dependabot[bot]  # Single author
+```
+
+```yaml
+when:
+  event: issues
+  author: reporter-username  # Issue reporter
 ```
 
 Supports arrays:
@@ -281,6 +287,23 @@ when:
 then:
   update_fields:
     '1234567890': '0987654321'  # "In Review"
+```
+
+### GitHub Issues
+
+Create an Asana task when an issue is opened:
+
+```yaml
+when:
+  event: issues
+  action: opened
+  has_asana_tasks: false
+then:
+  create_task:
+    project: '1234567890'
+    workspace: '0987654321'
+    title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+    notes: '{{issue.body}}'
 ```
 
 ## Validation Rules

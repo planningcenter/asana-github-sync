@@ -38,15 +38,15 @@ function extractFromText(pattern: string, text: string): string {
  * Call this once at startup before evaluating templates
  */
 export function registerHelpers(): void {
-  // Helper: Extract from PR body
+  // Helper: Extract from body (PR or issue)
   Handlebars.registerHelper('extract_from_body', function (this: HandlebarsContext, pattern: string) {
-    const body = this.pr?.body || '';
+    const body = this.pr?.body || this.issue?.body || '';
     return extractFromText(pattern, body);
   });
 
-  // Helper: Extract from PR title
+  // Helper: Extract from title (PR or issue)
   Handlebars.registerHelper('extract_from_title', function (this: HandlebarsContext, pattern: string) {
-    const title = this.pr?.title || '';
+    const title = this.pr?.title || this.issue?.title || '';
     return extractFromText(pattern, title);
   });
 

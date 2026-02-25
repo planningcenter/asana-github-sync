@@ -10,6 +10,10 @@ Attach GitHub pull request to existing Asana tasks via the GitHub integration.
 
 The `attach_pr_to_tasks` action links the current GitHub PR to existing Asana tasks through the Asana-GitHub integration. This creates a proper integration attachment with live PR status in Asana, rather than just a plain URL link.
 
+::: warning Pull request events only
+`attach_pr_to_tasks` is **not supported for `issues` events**. The Asana-GitHub integration is designed specifically for pull requests. Using this action in an `issues` rule logs a warning and skips the step.
+:::
+
 ::: warning Requirements
 - Requires `has_asana_tasks: true` (default)
 - Requires `integration_secret` input to be configured

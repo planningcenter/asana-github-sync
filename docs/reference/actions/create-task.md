@@ -1,6 +1,6 @@
 # create_task
 
-Create a new Asana task from a PR.
+Create a new Asana task from a PR or GitHub issue.
 
 ## Type
 
@@ -8,12 +8,12 @@ Create a new Asana task from a PR.
 
 ## Description
 
-The `create_task` action creates a new Asana task with the specified properties. This is **only allowed** when `has_asana_tasks: false` (PR description contains no Asana task URLs).
+The `create_task` action creates a new Asana task with the specified properties. This is **only allowed** when `has_asana_tasks: false` (PR or issue body contains no Asana task URLs).
 
-Use this for automated task creation, typically for bot PRs (Dependabot, Renovate) or other PRs that don't have associated Asana tasks.
+Use this for automated task creation — bot PRs, human PRs without existing tasks, or GitHub issues that need tracking in Asana.
 
 ::: warning Critical Requirement
-`create_task` requires `has_asana_tasks: false` in the condition. You cannot create tasks for PRs that already have Asana links.
+`create_task` requires `has_asana_tasks: false` in the condition. You cannot create tasks for PRs or issues that already have Asana links.
 :::
 
 ## Syntax
@@ -21,15 +21,26 @@ Use this for automated task creation, typically for bot PRs (Dependabot, Renovat
 ```yaml
 then:
   create_task:
-    project: '1234567890'      # Required: Project GID
-    workspace: '0987654321'    # Required: Workspace GID
-    section: '1111111111'      # Optional: Section GID
-    title: '{{pr.title}}'      # Required: Task title (template)
-    notes: 'Description here'  # Optional: Plain text notes
-    html_notes: '<b>HTML</b>'  # Optional: HTML notes (mutually exclusive with notes)
-    assignee: '2222222222'     # Optional: User GID or "me"
-    initial_fields:            # Optional: Custom field values
+    project: '1234567890'          # Required: Project GID
+    workspace: '0987654321'        # Required: Workspace GID
+    section: '1111111111'          # Optional: Section GID
+    title: '{{pr.title}}'          # Required: Task title (template)
+    notes: 'Description here'      # Optional: Plain text notes
+    html_notes: '<b>HTML</b>'      # Optional: HTML notes (mutually exclusive with notes)
+    assignee: '2222222222'         # Optional: User GID or "me"
+    initial_fields:                # Optional: Custom field values
       '3333333333': 'Value'
+```
+
+For `issues` events, use `{{issue.*}}` template variables:
+
+```yaml
+then:
+  create_task:
+    project: '1234567890'
+    workspace: '0987654321'
+    title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+    notes: '{{issue.body}}'
 ```
 
 ## Required Fields
@@ -52,7 +63,29 @@ then:
 
 ## Examples
 
-### Basic Task Creation
+### Task from GitHub Issue
+
+Create an Asana task when a GitHub issue is opened:
+
+```yaml
+rules:
+  - when:
+      event: issues
+      action: opened
+      has_asana_tasks: false
+    then:
+      create_task:
+        project: '1234567890'
+        workspace: '0987654321'
+        title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+        notes: |
+          {{issue.body}}
+
+          Reported by: {{issue.author}}
+          Issue: {{issue.url}}
+```
+
+### Basic Task Creation (PR)
 
 Create task for Dependabot PR:
 
@@ -194,10 +227,10 @@ rules:
 The integration user ('me') is **automatically removed** as a follower after task creation. You don't need to configure this.
 :::
 
-### PR Body Modification and Event Loops
+### Body Modification and Event Loops
 
 ::: warning Important
-When a task is created, the action appends the Asana task link to the PR body. This triggers a `pull_request.edited` event in GitHub.
+When a task is created, the action appends the Asana task link to the **PR or issue body**. For PRs this triggers a `pull_request.edited` event; for issues it triggers an `issues.edited` event.
 :::
 
 **This can create infinite loops if you're not careful:**
@@ -207,11 +240,20 @@ When a task is created, the action appends the Asana task link to the PR body. T
 rules:
   - when:
       event: pull_request
-      action: edited  # This fires after task creation!
+      action: edited  # Fires after task creation appends the link!
       has_asana_tasks: false
     then:
       create_task:
         # Creates task → appends link → triggers edited → creates task → ...
+
+# ❌ DANGEROUS - Same problem for issues
+  - when:
+      event: issues
+      action: edited  # Fires after task creation appends the link!
+      has_asana_tasks: false
+    then:
+      create_task:
+        # ...
 ```
 
 **Safe patterns:**
@@ -227,18 +269,16 @@ rules:
       create_task:
         # ...
 
-# ✅ Safe - 'edited' only updates existing tasks
-rules:
   - when:
-      event: pull_request
-      action: edited
-      has_asana_tasks: true
+      event: issues
+      action: opened        # 'opened' does not re-fire after body edit
+      has_asana_tasks: false
     then:
-      update_fields:
+      create_task:
         # ...
 ```
 
-**Key insight:** Use `has_asana_tasks: false` only with actions like `opened`, `labeled`, or `ready_for_review` — never with `edited`.
+**Key insight:** Use `has_asana_tasks: false` only with `action: opened` (or `labeled`, `ready_for_review`) — never with `action: edited`.
 
 ### Notes vs HTML Notes
 

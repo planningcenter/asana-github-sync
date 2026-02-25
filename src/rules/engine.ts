@@ -14,33 +14,42 @@ import type { HandlebarsContext, CommentContext } from '../expression/context';
 export interface RuleContext {
   eventName: string;
   action: string;
-  pr: {
+  pr?: {                // Only present for pull_request events
     number: number;
     title: string;
     body: string;
     merged: boolean;
     draft: boolean;
     author: string;
-    assignee?: string; // Optional: PR assignee username (may be undefined if not assigned)
+    assignee?: string;
     base_ref: string;
     head_ref: string;
     url: string;
   };
+  issue?: {             // Only present for issues events
+    number: number;
+    title: string;
+    body: string;
+    author: string;
+    assignee?: string;
+    url: string;
+    state: string;
+  };
   label?: {
     name: string;
   };
-  labels?: string[]; // Optional: All labels currently on the PR
-  comments?: string; // All PR comments concatenated (if fetched)
-  hasAsanaTasks: boolean; // Whether PR body contains Asana task links
-  userMappings?: Record<string, string>; // GitHub username → Asana user GID mapping
+  labels?: string[];   // All labels on the PR or issue
+  comments?: string;   // All comments concatenated (if fetched)
+  hasAsanaTasks: boolean;
+  userMappings?: Record<string, string>;
 }
 
 /**
  * Build rule context from GitHub context
  *
  * @param githubContext - GitHub Actions context
- * @param comments - Optional PR comments (pre-fetched if needed by caller)
- * @param hasAsanaTasks - Whether PR body contains Asana task links
+ * @param comments - Optional comments (pre-fetched if needed by caller)
+ * @param hasAsanaTasks - Whether the body contains Asana task links
  * @param userMappings - Optional GitHub username → Asana user GID mapping
  * @returns Strongly-typed context for rules engine
  */
@@ -51,39 +60,58 @@ export function buildRuleContext(
   userMappings?: Record<string, string>
 ): RuleContext {
   const { eventName, payload } = githubContext;
-  const pr = payload.pull_request;
-
-  if (!pr) {
-    throw new Error('No pull_request in GitHub payload');
-  }
 
   const context: RuleContext = {
     eventName,
     action: payload.action || '',
-    pr: {
+    hasAsanaTasks,
+  };
+
+  if (eventName === 'pull_request') {
+    const pr = payload.pull_request;
+    if (!pr) {
+      throw new Error('No pull_request in GitHub payload');
+    }
+    context.pr = {
       number: pr.number,
       title: pr.title,
       body: pr.body || '',
       merged: pr.merged || false,
       draft: pr.draft || false,
       author: pr.user.login,
-      assignee: pr.assignee?.login, // Optional: may be undefined
+      assignee: pr.assignee?.login,
       base_ref: pr.base.ref,
       head_ref: pr.head.ref,
       url: pr.html_url || '',
-    },
-    hasAsanaTasks,
-  };
-
-  if (payload.label) {
-    context.label = {
-      name: payload.label.name,
     };
-  }
-
-  // Extract all label names from PR (if present)
-  if (pr.labels && Array.isArray(pr.labels)) {
-    context.labels = pr.labels.map((label) => label.name);
+    if (payload.label) {
+      context.label = { name: payload.label.name };
+    }
+    if (pr.labels && Array.isArray(pr.labels)) {
+      context.labels = pr.labels.map((label: { name: string }) => label.name);
+    }
+  } else if (eventName === 'issues') {
+    const issue = payload.issue;
+    if (!issue) {
+      throw new Error('No issue in GitHub payload');
+    }
+    context.issue = {
+      number: issue.number,
+      title: issue.title,
+      body: issue.body || '',
+      author: issue.user.login,
+      assignee: issue.assignee?.login,
+      url: issue.html_url || '',
+      state: issue.state || 'open',
+    };
+    if (payload.label) {
+      context.label = { name: payload.label.name };
+    }
+    if (issue.labels && Array.isArray(issue.labels)) {
+      context.labels = issue.labels.map((label: { name: string }) => label.name);
+    }
+  } else {
+    throw new Error(`Unsupported event: ${eventName}. Supported events: pull_request, issues`);
   }
 
   if (comments !== undefined) {
@@ -118,14 +146,18 @@ export function matchesCondition(condition: Condition, context: RuleContext): bo
     }
   }
 
-  // Merged (if specified) must match
-  if (condition.merged !== undefined && condition.merged !== context.pr.merged) {
-    return false;
+  // Merged (if specified) - only applies to pull_request events
+  if (condition.merged !== undefined) {
+    if (!context.pr || condition.merged !== context.pr.merged) {
+      return false;
+    }
   }
 
-  // Draft (if specified) must match
-  if (condition.draft !== undefined && condition.draft !== context.pr.draft) {
-    return false;
+  // Draft (if specified) - only applies to pull_request events
+  if (condition.draft !== undefined) {
+    if (!context.pr || condition.draft !== context.pr.draft) {
+      return false;
+    }
   }
 
   // Label (if specified) must match
@@ -154,10 +186,11 @@ export function matchesCondition(condition: Condition, context: RuleContext): bo
     }
   }
 
-  // Author (if specified) must match
+  // Author (if specified) must match - works for both PR and issue events
   if (condition.author !== undefined) {
     const authors = Array.isArray(condition.author) ? condition.author : [condition.author];
-    if (!authors.includes(context.pr.author)) {
+    const author = context.pr?.author || context.issue?.author || '';
+    if (!authors.includes(author)) {
       return false;
     }
   }
@@ -212,6 +245,7 @@ export function executeRules(rules: Rule[], context: RuleContext): RuleExecution
     // Convert to Handlebars context for template evaluation
     const handlebarsContext = {
       pr: context.pr,
+      issue: context.issue,
       event: {
         name: context.eventName,
         action: context.action,
@@ -372,6 +406,7 @@ export function buildCommentContext(
 
   return {
     pr: ruleContext.pr,
+    issue: ruleContext.issue,
     event: {
       name: ruleContext.eventName,
       action: ruleContext.action,

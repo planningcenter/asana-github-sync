@@ -21,22 +21,16 @@ when:
 
 ## Supported Events
 
-This action works with any GitHub event, but is primarily designed for PR workflows:
-
 | Event | Support | Description |
 |-------|---------|-------------|
-| `pull_request` | ✅ **Primary** | PR opened, closed, edited, labeled, etc. |
-| `pull_request_target` | ✅ Supported | Similar to pull_request but runs in base branch context |
-| `push` | ⚠️ Limited | Code pushed to a branch (no PR context) |
-| `issues` | ⚠️ Limited | Issue events (no PR context) |
-| `issue_comment` | ⚠️ Limited | Comments on issues or PRs |
+| `pull_request` | ✅ **Primary** | PR opened, closed, edited, labeled, etc. Full PR context and all features. |
+| `issues` | ✅ **Supported** | Issue opened, closed, labeled, etc. Full issue context and task creation. |
+| `pull_request_target` | ⚠️ Limited | Similar to `pull_request` but runs in base branch context. |
+| `push` | ❌ Unsupported | No PR or issue context available. |
+| `issue_comment` | ❌ Unsupported | No PR or issue context available. |
 
 ::: tip
-**Recommended: `pull_request`** - This is the primary event this action is designed for. It provides full PR context, Asana task extraction, and all template variables.
-:::
-
-::: info
-While the action technically works with any GitHub event, events without PR context won't have access to PR-specific template variables like `pr.title`, `pr.author`, etc.
+**`pull_request` and `issues` are the two supported events.** Both provide full context and support all relevant features. The action returns early with a warning for any other event type.
 :::
 
 For a complete list of GitHub events, see:
@@ -44,7 +38,7 @@ For a complete list of GitHub events, see:
 
 ## Examples
 
-### Basic PR Event
+### PR Event
 
 Match any pull request event:
 
@@ -57,22 +51,63 @@ rules:
         '1234567890': 'In Progress'
 ```
 
+### Issues Event
+
+Create an Asana task when a GitHub issue is opened:
+
+```yaml
+rules:
+  - when:
+      event: issues
+      action: opened
+      has_asana_tasks: false
+    then:
+      create_task:
+        project: '1234567890'
+        workspace: '0987654321'
+        title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+        notes: '{{issue.body}}'
+```
+
 ## Workflow Configuration
 
-The `event` in your rule must match an event in your workflow's `on:` section:
+The `event` in your rule must match an event in your workflow's `on:` section. To handle both PRs and issues, listen for both events:
 
 ```yaml
 # .github/workflows/asana-sync.yml
 on:
-  pull_request:        # <-- Workflow listens for this event
-    types: [opened, closed]
+  pull_request:
+    types: [opened, closed, labeled, reopened, ready_for_review]
+  issues:
+    types: [opened, closed, labeled, reopened]
 
-# In rules:
-rules:
-  - when:
-      event: pull_request  # <-- Rule matches this event
-    then:
-      # ...
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: planningcenter/asana-github-sync@main
+        with:
+          asana_token: ${{ secrets.ASANA_TOKEN }}
+          github_token: ${{ github.token }}
+          rules: |
+            rules:
+              - when:
+                  event: pull_request
+                  action: opened
+                  draft: false
+                then:
+                  update_fields:
+                    '1234567890': 'In Review'
+
+              - when:
+                  event: issues
+                  action: opened
+                  has_asana_tasks: false
+                then:
+                  create_task:
+                    project: '1234567890'
+                    workspace: '0987654321'
+                    title: 'Issue #{{issue.number}}: {{issue.title}}'
 ```
 
 ## Combining with Other Conditions
@@ -81,14 +116,30 @@ Use additional conditions to be more specific:
 
 ```yaml
 rules:
+  # PR-specific conditions
   - when:
       event: pull_request
-      action: opened           # Only when PR opens
-      draft: false             # Only non-draft PRs
+      action: opened
+      draft: false             # PR-only condition
     then:
       update_fields:
         '1234567890': 'In Review'
+
+  # Issue-specific rule
+  - when:
+      event: issues
+      action: opened
+      has_asana_tasks: false
+    then:
+      create_task:
+        project: '1234567890'
+        workspace: '0987654321'
+        title: '{{issue.title}}'
 ```
+
+::: info PR-only conditions
+The `merged` and `draft` conditions are **PR-only** — they will never match on an `issues` event, even if specified.
+:::
 
 ## Validation Rules
 
