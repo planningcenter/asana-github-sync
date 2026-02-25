@@ -10,7 +10,7 @@ import type { CommentContext } from '../expression/context';
 export interface RuleContext {
     eventName: string;
     action: string;
-    pr: {
+    pr?: {
         number: number;
         title: string;
         body: string;
@@ -21,6 +21,15 @@ export interface RuleContext {
         base_ref: string;
         head_ref: string;
         url: string;
+    };
+    issue?: {
+        number: number;
+        title: string;
+        body: string;
+        author: string;
+        assignee?: string;
+        url: string;
+        state: string;
     };
     label?: {
         name: string;
@@ -34,8 +43,8 @@ export interface RuleContext {
  * Build rule context from GitHub context
  *
  * @param githubContext - GitHub Actions context
- * @param comments - Optional PR comments (pre-fetched if needed by caller)
- * @param hasAsanaTasks - Whether PR body contains Asana task links
+ * @param comments - Optional comments (pre-fetched if needed by caller)
+ * @param hasAsanaTasks - Whether the body contains Asana task links
  * @param userMappings - Optional GitHub username → Asana user GID mapping
  * @returns Strongly-typed context for rules engine
  */
