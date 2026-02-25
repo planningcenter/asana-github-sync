@@ -1,0 +1,36 @@
+name: Asana Issue Sync (Dry Run)
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Asana Task from Issue
+        uses: ./
+        with:
+          asana_token: ${{ secrets.ASANA_TOKEN }}
+          github_token: ${{ github.token }}
+          dry_run: true
+          rules: |
+            rules:
+              - when:
+                  event: issues
+                  action: opened
+                  has_asana_tasks: false
+                then:
+                  create_task:
+                    project: 'YOUR_PROJECT_GID'
+                    workspace: 'YOUR_WORKSPACE_GID'
+                    title: 'GH Issue #{{issue.number}}: {{issue.title}}'
+                    notes: |
+                      {{issue.body}}
+
+                      ---
+                      Reported by: @{{issue.author}}
+                      GitHub Issue: {{issue.url}}
