@@ -9,7 +9,7 @@ import { isApiError } from "./errors"
 /**
  * Retry configuration
  */
-const RETRY_CONFIG = {
+export const RETRY_CONFIG = {
   maxAttempts: 3,
   delay: 1000, // 1 second initial delay
   factor: 2, // 2x exponential backoff
