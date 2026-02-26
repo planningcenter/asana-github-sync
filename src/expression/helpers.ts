@@ -5,6 +5,7 @@
 
 import * as core from '@actions/core';
 import Handlebars from 'handlebars';
+import { marked } from 'marked';
 import type { HandlebarsContext } from './context';
 
 /**
@@ -92,6 +93,43 @@ export function registerHelpers(): void {
         .replace(/\n{3,}/g, '\n\n') // Collapse 3+ newlines to 2
         .trim()
     );
+  });
+
+  // Helper: Convert markdown to HTML for use in Asana html_notes
+  Handlebars.registerHelper('markdown_to_html', function (text: string) {
+    if (!text) return '';
+
+    // Pre-process: strip content that doesn't translate well to Asana HTML
+    const cleaned = text
+      .replace(/\[!\[([^\]]*)\]\([^)]+(?:\s+"[^"]*")?\)\]\(([^)]+)\)/g, '') // Linked images
+      .replace(/!\[[^\]]*\]\([^)]+(?:\s+"[^"]*")?\)/g, '') // Standalone images
+      .replace(/\[\/\/\]: # \([^)]*\)/g, '') // HTML-style comments
+      .replace(/<\/?details[^>]*>/gi, '') // Strip <details> open/close tags, keep content
+      .replace(/<\/?summary[^>]*>/gi, '') // Strip <summary> open/close tags, keep text
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim();
+
+    // Convert markdown to HTML (async: false narrows return type to string)
+    // Drop raw HTML blocks/inline HTML to avoid unsafe/unsupported tags and attributes
+    const renderer = new marked.Renderer();
+    renderer.html = () => '';
+    const html = marked.parse(cleaned, { async: false, renderer });
+
+    // Post-process: fix Asana compatibility
+    const result = html
+      .replace(/<img[^>]*\/?>/gi, '') // Remove img tags (Asana only supports attached images)
+      .replace(/<h([3-6])([^>]*)>/gi, '<h2$2>') // Downgrade h3-h6 to h2
+      .replace(/<\/h[3-6]>/gi, '</h2>') // Close tags for h3-h6
+      .replace(/ class="[^"]*"/gi, '') // Strip class attributes (e.g. language-js on code)
+      .replace(/<del>/gi, '<s>') // Convert <del> to <s> for Asana strikethrough
+      .replace(/<\/del>/gi, '</s>')
+      .replace(/<\/?thead[^>]*>/gi, '') // Strip <thead> wrapper (not in Asana's supported tags)
+      .replace(/<\/?tbody[^>]*>/gi, '') // Strip <tbody> wrapper (not in Asana's supported tags)
+      .replace(/<th([^>]*)>/gi, '<td$1>') // Convert <th> to <td>
+      .replace(/<\/th>/gi, '</td>'); // Convert </th> to </td>
+
+    return new Handlebars.SafeString(result);
   });
 
   // Helper: Map GitHub username to Asana user GID
