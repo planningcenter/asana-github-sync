@@ -6,16 +6,16 @@
  * Custom error class for API errors with status code information
  */
 export class ApiError extends Error {
-  status: number;
-  statusCode: number;
-  body?: string;
+  status: number
+  statusCode: number
+  body?: string
 
   constructor(message: string, status: number, body?: string) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.statusCode = status;
-    this.body = body;
+    super(message)
+    this.name = "ApiError"
+    this.status = status
+    this.statusCode = status
+    this.body = body
   }
 }
 
@@ -23,5 +23,5 @@ export class ApiError extends Error {
  * Type guard to check if error is an ApiError
  */
 export function isApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError;
+  return error instanceof ApiError
 }

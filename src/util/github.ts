@@ -2,9 +2,9 @@
  * GitHub API utilities
  */
 
-import * as core from '@actions/core';
-import * as github from '@actions/github';
-import type { HandlebarsContext, CommentContext } from '../expression/context';
+import * as core from "@actions/core"
+import * as github from "@actions/github"
+import type { HandlebarsContext, CommentContext } from "../expression/context"
 
 /**
  * Fetch all comments for a pull request
@@ -15,24 +15,24 @@ import type { HandlebarsContext, CommentContext } from '../expression/context';
  */
 export async function fetchPRComments(githubToken: string, prNumber: number): Promise<string> {
   try {
-    const octokit = github.getOctokit(githubToken);
-    const { owner, repo } = github.context.repo;
+    const octokit = github.getOctokit(githubToken)
+    const { owner, repo } = github.context.repo
 
     const commentsResponse = await octokit.rest.issues.listComments({
       owner,
       repo,
       issue_number: prNumber,
       per_page: 100,
-    });
+    })
 
-    const comments = commentsResponse.data.map(c => c.body || '').join('\n');
-    core.debug(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`);
+    const comments = commentsResponse.data.map((c) => c.body || "").join("\n")
+    core.debug(`✓ Fetched ${commentsResponse.data.length} comment(s) for PR #${prNumber}`)
 
-    return comments;
+    return comments
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    core.warning(`Failed to fetch comments for PR #${prNumber}: ${errorMessage}`);
-    return ''; // Return empty string on error, don't block workflow
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    core.warning(`Failed to fetch comments for PR #${prNumber}: ${errorMessage}`)
+    return "" // Return empty string on error, don't block workflow
   }
 }
 
@@ -51,25 +51,25 @@ export async function postPRComment(
   dryRun = false
 ): Promise<void> {
   if (dryRun) {
-    core.info(`[DRY RUN] Would post comment to PR #${prNumber}:`);
-    core.info(`[DRY RUN] ${body.substring(0, 200)}${body.length > 200 ? '...' : ''}`);
+    core.info(`[DRY RUN] Would post comment to PR #${prNumber}:`)
+    core.info(`[DRY RUN] ${body.substring(0, 200)}${body.length > 200 ? "..." : ""}`)
   } else {
     try {
-      const octokit = github.getOctokit(githubToken);
-      const { owner, repo } = github.context.repo;
+      const octokit = github.getOctokit(githubToken)
+      const { owner, repo } = github.context.repo
 
       await octokit.rest.issues.createComment({
         owner,
         repo,
         issue_number: prNumber,
         body,
-      });
+      })
 
-      core.info(`✓ Posted comment to PR #${prNumber}`);
+      core.info(`✓ Posted comment to PR #${prNumber}`)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error)
       // Don't fail workflow, just log error
-      core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`);
+      core.error(`Failed to post comment to PR #${prNumber}: ${errorMessage}`)
     }
   }
 }
@@ -93,61 +93,61 @@ export async function postCommentTemplates(
   dryRun = false
 ): Promise<void> {
   if (commentTemplates.length === 0) {
-    return;
+    return
   }
 
-  core.info('');
-  core.info('Posting PR comments...');
+  core.info("")
+  core.info("Posting PR comments...")
 
   // Fetch existing comments once for deduplication (skip in dry-run)
-  let existingBodies: Set<string>;
+  let existingBodies: Set<string>
   if (dryRun) {
-    existingBodies = new Set();
+    existingBodies = new Set()
   } else {
-    const octokit = github.getOctokit(githubToken);
-    const { owner, repo } = github.context.repo;
+    const octokit = github.getOctokit(githubToken)
+    const { owner, repo } = github.context.repo
 
     try {
       const { data: comments } = await octokit.rest.issues.listComments({
         owner,
         repo,
         issue_number: prNumber,
-      });
-      existingBodies = new Set(comments.map(c => c.body || '').filter(b => b !== ''));
-      core.debug(`Fetched ${comments.length} existing comments for deduplication`);
+      })
+      existingBodies = new Set(comments.map((c) => c.body || "").filter((b) => b !== ""))
+      core.debug(`Fetched ${comments.length} existing comments for deduplication`)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`);
-      existingBodies = new Set();
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      core.warning(`Failed to fetch comments for deduplication: ${errorMessage}`)
+      existingBodies = new Set()
     }
   }
 
   for (const [index, template] of commentTemplates.entries()) {
     try {
-      const commentBody = evaluateTemplate(template, commentContext);
+      const commentBody = evaluateTemplate(template, commentContext)
 
       // Skip empty comments - usually means conditional logic evaluated to false
       // NOTE: Whitespace is preserved. Only exactly '' (empty string) is skipped.
       // TODO(docs): Document this behavior - empty comment templates are skipped
-      if (commentBody === '') {
-        core.info(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (empty result)`);
-        continue;
+      if (commentBody === "") {
+        core.info(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (empty result)`)
+        continue
       }
 
       // Check for duplicate comment
       if (existingBodies.has(commentBody)) {
-        core.debug(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`);
-        continue;
+        core.debug(`✓ Comment ${index + 1} of ${commentTemplates.length} skipped (already exists)`)
+        continue
       }
 
-      await postPRComment(githubToken, prNumber, commentBody, dryRun);
-      existingBodies.add(commentBody); // Track what we posted for subsequent templates
+      await postPRComment(githubToken, prNumber, commentBody, dryRun)
+      existingBodies.add(commentBody) // Track what we posted for subsequent templates
       if (!dryRun) {
-        core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`);
+        core.info(`✓ Posted comment ${index + 1} of ${commentTemplates.length}`)
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.error(`Failed to process comment template ${index + 1}: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      core.error(`Failed to process comment template ${index + 1}: ${errorMessage}`)
       // Continue with other comments
     }
   }
@@ -170,34 +170,34 @@ export async function appendAsanaLinkToIssue(
   dryRun = false
 ): Promise<void> {
   if (dryRun) {
-    core.info(`[DRY RUN] Would append Asana link to issue #${issueNumber}:`);
-    core.info(`[DRY RUN]   - Task: ${taskName}`);
-    core.info(`[DRY RUN]   - URL: ${taskUrl}`);
+    core.info(`[DRY RUN] Would append Asana link to issue #${issueNumber}:`)
+    core.info(`[DRY RUN]   - Task: ${taskName}`)
+    core.info(`[DRY RUN]   - URL: ${taskUrl}`)
   } else {
     try {
-      const octokit = github.getOctokit(githubToken);
-      const { owner, repo } = github.context.repo;
+      const octokit = github.getOctokit(githubToken)
+      const { owner, repo } = github.context.repo
 
       const { data: issue } = await octokit.rest.issues.get({
         owner,
         repo,
         issue_number: issueNumber,
-      });
+      })
 
-      const currentBody = issue.body || '';
-      const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+      const currentBody = issue.body || ""
+      const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`
 
       await octokit.rest.issues.update({
         owner,
         repo,
         issue_number: issueNumber,
         body: newBody,
-      });
+      })
 
-      core.info(`✓ Added Asana link to issue #${issueNumber}`);
+      core.info(`✓ Added Asana link to issue #${issueNumber}`)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.error(`Failed to update issue body: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      core.error(`Failed to update issue body: ${errorMessage}`)
     }
   }
 }
@@ -219,37 +219,37 @@ export async function appendAsanaLinkToPR(
   dryRun = false
 ): Promise<void> {
   if (dryRun) {
-    core.info(`[DRY RUN] Would append Asana link to PR #${prNumber}:`);
-    core.info(`[DRY RUN]   - Task: ${taskName}`);
-    core.info(`[DRY RUN]   - URL: ${taskUrl}`);
+    core.info(`[DRY RUN] Would append Asana link to PR #${prNumber}:`)
+    core.info(`[DRY RUN]   - Task: ${taskName}`)
+    core.info(`[DRY RUN]   - URL: ${taskUrl}`)
   } else {
     try {
-      const octokit = github.getOctokit(githubToken);
-      const { owner, repo } = github.context.repo;
+      const octokit = github.getOctokit(githubToken)
+      const { owner, repo } = github.context.repo
 
       // Fetch current PR data
       const { data: pr } = await octokit.rest.pulls.get({
         owner,
         repo,
         pull_number: prNumber,
-      });
+      })
 
-      const currentBody = pr.body || '';
+      const currentBody = pr.body || ""
 
       // Append Asana link
-      const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`;
+      const newBody = `${currentBody}\n\n---\n\nAsana task: [${taskName}](${taskUrl})`
 
       await octokit.rest.pulls.update({
         owner,
         repo,
         pull_number: prNumber,
         body: newBody,
-      });
+      })
 
-      core.info(`✓ Added Asana link to PR #${prNumber}`);
+      core.info(`✓ Added Asana link to PR #${prNumber}`)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.error(`Failed to update PR body: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      core.error(`Failed to update PR body: ${errorMessage}`)
       // Don't throw - this is not critical enough to fail the workflow
     }
   }
