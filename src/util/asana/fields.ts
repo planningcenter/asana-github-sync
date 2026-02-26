@@ -2,23 +2,23 @@
  * Custom field operations - schema fetching, caching, and value coercion
  */
 
-import * as core from '@actions/core';
-import type { AsanaCustomField, AsanaEnumOption } from '../../types';
-import { withRetry } from '../retry';
-import { asanaRequest } from './client';
+import * as core from "@actions/core"
+import type { AsanaCustomField, AsanaEnumOption } from "../../types"
+import { withRetry } from "../retry"
+import { asanaRequest } from "./client"
 
 /**
  * Module-level cache for custom field schemas
  * Persists for the lifetime of the action run to avoid redundant API calls
  * when updating multiple tasks with the same fields
  */
-const fieldSchemaCache = new Map<string, AsanaCustomField>();
+const fieldSchemaCache = new Map<string, AsanaCustomField>()
 
 /**
  * Clear the field schema cache (primarily for testing)
  */
 export function clearFieldSchemaCache(): void {
-  fieldSchemaCache.clear();
+  fieldSchemaCache.clear()
 }
 
 /**
@@ -29,11 +29,11 @@ export function clearFieldSchemaCache(): void {
  * @returns Custom field definition
  */
 export async function fetchCustomField(token: string, customFieldGid: string) {
-  core.debug(`Fetching custom field ${customFieldGid}...`);
+  core.debug(`Fetching custom field ${customFieldGid}...`)
   return await withRetry(
     () => asanaRequest<AsanaCustomField>(token, `/custom_fields/${customFieldGid}`),
     `fetch custom field ${customFieldGid}`
-  );
+  )
 }
 
 /**
@@ -44,12 +44,12 @@ export async function fetchCustomField(token: string, customFieldGid: string) {
  * @returns Custom field schema
  */
 export async function getFieldSchema(token: string, fieldGid: string): Promise<AsanaCustomField> {
-  let schema = fieldSchemaCache.get(fieldGid);
+  let schema = fieldSchemaCache.get(fieldGid)
   if (!schema) {
-    schema = await fetchCustomField(token, fieldGid);
-    fieldSchemaCache.set(fieldGid, schema);
+    schema = await fetchCustomField(token, fieldGid)
+    fieldSchemaCache.set(fieldGid, schema)
   }
-  return schema;
+  return schema
 }
 
 /**
@@ -60,27 +60,33 @@ export async function getFieldSchema(token: string, fieldGid: string): Promise<A
  * @param customFieldGid - Custom field GID for error messages
  * @returns Enum option GID, or null if not found
  */
-function findEnumOption(customField: AsanaCustomField, stateName: string, customFieldGid: string): string | null {
-  const enumOptions = customField.enum_options || [];
+function findEnumOption(
+  customField: AsanaCustomField,
+  stateName: string,
+  customFieldGid: string
+): string | null {
+  const enumOptions = customField.enum_options || []
 
   if (enumOptions.length === 0) {
     core.error(
       `Custom field ${customFieldGid} has no enum options. It may not be an enum field (type: ${customField.type}).`
-    );
-    return null;
+    )
+    return null
   }
 
-  const matchingOption: AsanaEnumOption | undefined = enumOptions.find((opt) => opt.name === stateName);
+  const matchingOption: AsanaEnumOption | undefined = enumOptions.find(
+    (opt) => opt.name === stateName
+  )
 
   if (!matchingOption) {
     core.error(
       `State "${stateName}" not found in custom field ${customFieldGid}. ` +
-        `Available options: ${enumOptions.map((o) => o.name).join(', ')}`
-    );
-    return null;
+        `Available options: ${enumOptions.map((o) => o.name).join(", ")}`
+    )
+    return null
   }
 
-  return matchingOption.gid;
+  return matchingOption.gid
 }
 
 /**
@@ -98,50 +104,50 @@ export function coerceFieldValue(
   fieldGid: string
 ): string | number | null {
   switch (schema.type) {
-    case 'enum':
+    case "enum":
       // Find matching enum option
-      const enumGid = findEnumOption(schema, rawValue, fieldGid);
+      const enumGid = findEnumOption(schema, rawValue, fieldGid)
       if (!enumGid) {
-        core.error(`Cannot update field ${fieldGid}: enum option "${rawValue}" not found`);
-        return null;
+        core.error(`Cannot update field ${fieldGid}: enum option "${rawValue}" not found`)
+        return null
       }
-      return enumGid;
+      return enumGid
 
-    case 'text':
-    case 'multi_line_text':
+    case "text":
+    case "multi_line_text":
       // Text fields: use string as-is
-      return rawValue;
+      return rawValue
 
-    case 'number':
+    case "number":
       // Number fields: parse and validate
-      const numberValue = Number(rawValue);
+      const numberValue = Number(rawValue)
       if (isNaN(numberValue)) {
-        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid number`);
-        return null;
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid number`)
+        return null
       }
-      return numberValue;
+      return numberValue
 
-    case 'date':
+    case "date":
       // Date fields: validate ISO 8601 format (YYYY-MM-DD)
       if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
-        core.error(`Cannot update field ${fieldGid}: "${rawValue}" must be YYYY-MM-DD format`);
-        return null;
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" must be YYYY-MM-DD format`)
+        return null
       }
       // Validate it's an actual valid date (check if parsing changes the value)
-      const dateObj = new Date(rawValue);
+      const dateObj = new Date(rawValue)
       if (isNaN(dateObj.getTime())) {
-        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`);
-        return null;
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`)
+        return null
       }
-      const roundTrip = dateObj.toISOString().split('T')[0];
+      const roundTrip = dateObj.toISOString().split("T")[0]
       if (roundTrip !== rawValue) {
-        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`);
-        return null;
+        core.error(`Cannot update field ${fieldGid}: "${rawValue}" is not a valid date`)
+        return null
       }
-      return rawValue;
+      return rawValue
 
     default:
-      core.warning(`Field ${fieldGid} has unsupported type '${schema.type}'. Skipping.`);
-      return null;
+      core.warning(`Field ${fieldGid} has unsupported type '${schema.type}'. Skipping.`)
+      return null
   }
 }

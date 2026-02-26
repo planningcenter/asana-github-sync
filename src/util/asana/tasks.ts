@@ -2,19 +2,19 @@
  * Task fetching operations
  */
 
-import * as core from '@actions/core';
-import type { AsanaTask } from '../../types';
-import { withRetry } from '../retry';
-import { asanaRequest } from './client';
+import * as core from "@actions/core"
+import type { AsanaTask } from "../../types"
+import { withRetry } from "../retry"
+import { asanaRequest } from "./client"
 
 /**
  * Asana attachment (partial - only fields we need)
  */
 interface AsanaAttachment {
-  gid: string;
-  name: string;
-  resource_subtype: string;
-  view_url?: string;
+  gid: string
+  name: string
+  resource_subtype: string
+  view_url?: string
 }
 
 /**
@@ -28,20 +28,20 @@ export async function fetchTaskDetails(
   taskGid: string,
   asanaToken: string
 ): Promise<{ gid: string; name: string; url: string }> {
-  core.debug(`Fetching details for task ${taskGid}...`);
+  core.debug(`Fetching details for task ${taskGid}...`)
 
   const task = await withRetry(
     () =>
       asanaRequest<AsanaTask>(asanaToken, `/tasks/${taskGid}?opt_fields=gid,name,permalink_url`),
     `fetch task ${taskGid}`
-  );
+  )
 
   return {
     gid: task.gid,
     name: task.name,
     // Fallback to constructed URL if permalink_url not available
     url: task.permalink_url || `https://app.asana.com/0/0/${task.gid}/f`,
-  };
+  }
 }
 
 /**
@@ -56,27 +56,27 @@ export async function fetchAllTaskDetails(
   taskGids: string[],
   asanaToken: string
 ): Promise<Array<{ gid: string; name: string; url: string }>> {
-  core.info('Fetching task details...');
+  core.info("Fetching task details...")
 
-  const results: Array<{ gid: string; name: string; url: string }> = [];
+  const results: Array<{ gid: string; name: string; url: string }> = []
 
   for (const taskGid of taskGids) {
     try {
-      const details = await fetchTaskDetails(taskGid, asanaToken);
-      results.push(details);
+      const details = await fetchTaskDetails(taskGid, asanaToken)
+      results.push(details)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      core.warning(`Failed to fetch details for task ${taskGid}: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      core.warning(`Failed to fetch details for task ${taskGid}: ${errorMessage}`)
       // Add placeholder so we can still proceed
       results.push({
         gid: taskGid,
         name: `Task ${taskGid}`,
         url: `https://app.asana.com/0/0/${taskGid}/f`,
-      });
+      })
     }
   }
 
-  return results;
+  return results
 }
 
 /**
@@ -94,7 +94,7 @@ export async function checkIfPRAlreadyLinked(
   asanaToken: string
 ): Promise<boolean> {
   try {
-    core.debug(`Checking if PR ${prUrl} is already linked to task ${taskGid}...`);
+    core.debug(`Checking if PR ${prUrl} is already linked to task ${taskGid}...`)
 
     const attachments = await withRetry(
       () =>
@@ -103,32 +103,32 @@ export async function checkIfPRAlreadyLinked(
           `/attachments?parent=${taskGid}&opt_fields=gid,name,resource_subtype,view_url`
         ),
       `check attachments for task ${taskGid}`
-    );
+    )
 
     // Check if any attachment's view_url or name contains the PR URL
     const isLinked = attachments.some((attachment) => {
       // Check view_url if available
       if (attachment.view_url && attachment.view_url === prUrl) {
-        return true;
+        return true
       }
       // Also check name as some attachments store URL in name
       if (attachment.name && attachment.name.includes(prUrl)) {
-        return true;
+        return true
       }
-      return false;
-    });
+      return false
+    })
 
     if (isLinked) {
-      core.info(`✓ PR already linked to task ${taskGid}, skipping`);
+      core.info(`✓ PR already linked to task ${taskGid}, skipping`)
     } else {
-      core.debug(`PR not yet linked to task ${taskGid}`);
+      core.debug(`PR not yet linked to task ${taskGid}`)
     }
 
-    return isLinked;
+    return isLinked
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    core.warning(`Failed to check existing links for task ${taskGid}: ${errorMessage}`);
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    core.warning(`Failed to check existing links for task ${taskGid}: ${errorMessage}`)
     // On error, return false to proceed with attachment (fail open)
-    return false;
+    return false
   }
 }

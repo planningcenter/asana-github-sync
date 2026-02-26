@@ -3,25 +3,25 @@
  */
 
 const extractIds = (text: string | undefined) => {
-  const taskIds = new Set<string>();
+  const taskIds = new Set<string>()
 
   if (text) {
     // Supports two formats:
     // 1. https://app.asana.com/0/0/1211770387762076
     // 2. https://app.asana.com/1/1202585680506197/project/1207308952015558/task/1210723244258078
-    const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(?:project\/\d+\/task\/)?(\d+)/g;
-    let match: RegExpExecArray | null;
+    const regex = /https:\/\/app\.asana\.com\/\d+\/\d+\/(?:project\/\d+\/task\/)?(\d+)/g
+    let match: RegExpExecArray | null
 
     while ((match = regex.exec(text)) !== null) {
-      const taskId = match[1];
+      const taskId = match[1]
       if (taskId) {
-        taskIds.add(taskId);
+        taskIds.add(taskId)
       }
     }
   }
 
-  return taskIds;
-};
+  return taskIds
+}
 
 /**
  * Extract Asana task IDs from PR body text
@@ -37,24 +37,22 @@ export function extractAsanaTaskIds(
   body: string | undefined,
   previousBody?: string | undefined
 ): {
-  taskIds: string[];
-  changed: boolean;
+  taskIds: string[]
+  changed: boolean
 } {
-  const taskIds = extractIds(body);
+  const taskIds = extractIds(body)
 
   // If previousBody provided, check if task IDs changed
   if (previousBody !== undefined) {
-    const previousTaskIds = extractIds(previousBody);
-    const oldSet = new Set(previousTaskIds);
-    const newSet = new Set(taskIds);
+    const previousTaskIds = extractIds(previousBody)
+    const oldSet = new Set(previousTaskIds)
+    const newSet = new Set(taskIds)
 
     // Check if sets are different
-    const changed =
-      oldSet.size !== newSet.size ||
-      Array.from(oldSet).some(id => !newSet.has(id));
+    const changed = oldSet.size !== newSet.size || Array.from(oldSet).some((id) => !newSet.has(id))
 
-    return { taskIds: Array.from(taskIds), changed };
+    return { taskIds: Array.from(taskIds), changed }
   }
 
-  return { taskIds: Array.from(taskIds), changed: true };
+  return { taskIds: Array.from(taskIds), changed: true }
 }

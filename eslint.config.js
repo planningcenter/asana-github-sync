@@ -1,7 +1,5 @@
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const tsParser = require('@typescript-eslint/parser');
-const jestPlugin = require('eslint-plugin-jest');
-
 module.exports = [
   {
     files: ['src/**/*.ts'],
@@ -28,8 +26,6 @@ module.exports = [
         prefer: 'type-imports', // Use import type for type-only imports
         fixStyle: 'separate-type-imports'
       }],
-      'semi': ['error', 'always'], // Always require semicolons
-
       // Additional best practices
       '@typescript-eslint/explicit-function-return-type': 'off', // Allow type inference
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -46,12 +42,10 @@ module.exports = [
       }
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      'jest': jestPlugin
+      '@typescript-eslint': tsPlugin
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      ...jestPlugin.configs.recommended.rules,
 
       // Coding Standards Enforcement (same as src, but allow some flexibility in tests)
       '@typescript-eslint/no-explicit-any': 'error',
@@ -62,8 +56,6 @@ module.exports = [
         prefer: 'type-imports',
         fixStyle: 'separate-type-imports'
       }],
-      'semi': ['error', 'always'],
-
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
     }

@@ -10,7 +10,10 @@
       "mcp__asana__asana_get_project_sections",
       "mcp__asana__asana_get_project",
       "mcp__asana__asana_update_task",
-      "Bash(bun add:*)"
+      "Bash(bun add:*)",
+      "Bash(bun test:*)",
+      "Bash(bun run build && bun test 2>&1)",
+      "Bash(gh issue:*)"
     ],
     "deny": [],
     "ask": []
