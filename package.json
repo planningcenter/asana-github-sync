@@ -36,7 +36,7 @@
     "msw": "^2.12.10",
     "prettier": "^3.8.1",
     "vitepress": "^1.6.4",
-    "vue": "^3.5.27"
+    "vue": "^3.5.29"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
