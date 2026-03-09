@@ -28,11 +28,11 @@
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.3.3",
+    "@types/node": "^25.3.5",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "esbuild": "^0.27.3",
-    "eslint": "^10.0.2",
+    "eslint": "^10.0.3",
     "msw": "^2.12.10",
     "prettier": "^3.8.1",
     "vitepress": "^1.6.4",
