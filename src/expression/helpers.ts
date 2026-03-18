@@ -94,7 +94,7 @@ export function registerHelpers(): void {
         // external URLs (e.g. GitHub screenshot embeds) cause a 400 from the API
         .replace(/<img\b[^>]*\/?>/gi, "")
         // Remove <p> tags (not supported by Asana; use newlines instead)
-        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/p\s*>/gi, "\n")
         .replace(/<p\b[^>]*>/gi, "")
         // Convert <br> to newlines
         .replace(/<br\s*\/?>/gi, "\n")

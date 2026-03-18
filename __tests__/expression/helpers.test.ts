@@ -419,6 +419,8 @@ describe('Handlebars Extraction Helpers', () => {
 
   describe('sanitize_markdown', () => {
     const compile = (md: string) => Handlebars.compile('{{sanitize_markdown text}}')({ text: md });
+    // Triple-stache bypasses Handlebars HTML escaping so we can assert on raw tag output
+    const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
 
     test('passes plain text through', () => {
       expect(compile('hello world')).toBe('hello world');
@@ -456,7 +458,6 @@ describe('Handlebars Extraction Helpers', () => {
     });
 
     test('does not strip tags that start with img but are not <img>', () => {
-      const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
       expect(raw('<imgur>not a real tag</imgur>')).toContain('<imgur>');
     });
 
@@ -465,8 +466,6 @@ describe('Handlebars Extraction Helpers', () => {
     });
 
     test('does not strip <pre> tags', () => {
-      // Use triple-stache to bypass Handlebars HTML escaping and test the raw helper output
-      const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
       const result = raw('<pre>code block</pre>');
       expect(result).toContain('<pre>');
       expect(result).toContain('</pre>');
@@ -478,6 +477,13 @@ describe('Handlebars Extraction Helpers', () => {
       expect(result).toContain('second');
       expect(result).not.toContain('<p');
       expect(result).not.toContain('</p>');
+      expect(result).toContain('\n');
+    });
+
+    test('handles </p> with whitespace before closing angle bracket', () => {
+      const result = compile('<p>first</p ><p>second</p >');
+      expect(result).not.toContain('</p');
+      expect(result).toContain('\n');
     });
 
     test('removes <details> blocks entirely', () => {
