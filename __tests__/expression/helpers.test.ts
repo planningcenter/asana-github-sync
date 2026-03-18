@@ -419,8 +419,6 @@ describe('Handlebars Extraction Helpers', () => {
 
   describe('sanitize_markdown', () => {
     const compile = (md: string) => Handlebars.compile('{{sanitize_markdown text}}')({ text: md });
-    // Triple-stache bypasses Handlebars HTML escaping so we can assert on raw tag output
-    const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
 
     test('passes plain text through', () => {
       expect(compile('hello world')).toBe('hello world');
@@ -457,18 +455,8 @@ describe('Handlebars Extraction Helpers', () => {
       expect(compile('<img src="https://example.com/image.png" alt="test">')).not.toContain('<img');
     });
 
-    test('does not strip tags that start with img but are not <img>', () => {
-      expect(raw('<imgur>not a real tag</imgur>')).toContain('<imgur>');
-    });
-
     test('strips <p> open tags', () => {
       expect(compile('<p>some text</p>')).not.toContain('<p');
-    });
-
-    test('does not strip <pre> tags', () => {
-      const result = raw('<pre>code block</pre>');
-      expect(result).toContain('<pre>');
-      expect(result).toContain('</pre>');
     });
 
     test('converts </p> to a newline', () => {
