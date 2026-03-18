@@ -455,8 +455,21 @@ describe('Handlebars Extraction Helpers', () => {
       expect(compile('<img src="https://example.com/image.png" alt="test">')).not.toContain('<img');
     });
 
+    test('does not strip tags that start with img but are not <img>', () => {
+      const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
+      expect(raw('<imgur>not a real tag</imgur>')).toContain('<imgur>');
+    });
+
     test('strips <p> open tags', () => {
       expect(compile('<p>some text</p>')).not.toContain('<p');
+    });
+
+    test('does not strip <pre> tags', () => {
+      // Use triple-stache to bypass Handlebars HTML escaping and test the raw helper output
+      const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
+      const result = raw('<pre>code block</pre>');
+      expect(result).toContain('<pre>');
+      expect(result).toContain('</pre>');
     });
 
     test('converts </p> to a newline', () => {
