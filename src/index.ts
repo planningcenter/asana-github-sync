@@ -59,12 +59,12 @@ async function run(): Promise<void> {
     }
 
     const eventName = github.context.eventName
-    const isPR = eventName === "pull_request"
+    const isPR = eventName === "pull_request" || eventName === "pull_request_review"
     const isIssue = eventName === "issues"
 
     if (!isPR && !isIssue) {
       core.warning(
-        `Unsupported event: ${eventName}. Only pull_request and issues events are supported.`
+        `Unsupported event: ${eventName}. Only pull_request, pull_request_review, and issues events are supported.`
       )
       return
     }

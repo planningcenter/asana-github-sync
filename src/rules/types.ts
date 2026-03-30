@@ -13,6 +13,7 @@ export interface Condition {
   draft?: boolean // Optional: PR draft status
   label?: string // Optional: Exact label name match (from labeled event)
   has_labels?: string | string[] // Optional: PR must have any of these labels (current state)
+  review_state?: string | string[] // Optional: Review state (e.g., 'approved', 'changes_requested', 'commented')
   has_asana_tasks?: boolean // Optional: Whether PR has Asana task links (default: true)
   author?: string | string[] // Optional: PR author username(s)
 }

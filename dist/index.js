@@ -3693,15 +3693,15 @@ var require_webidl = __commonJS({
         message: `"${context3.value}" is an invalid ${context3.type}.`
       });
     };
-    webidl.brandCheck = function(V, I2, opts) {
+    webidl.brandCheck = function(V2, I2, opts) {
       if (opts?.strict !== false) {
-        if (!(V instanceof I2)) {
+        if (!(V2 instanceof I2)) {
           const err = new TypeError("Illegal invocation");
           err.code = "ERR_INVALID_THIS";
           throw err;
         }
       } else {
-        if (V?.[Symbol.toStringTag] !== I2.prototype[Symbol.toStringTag]) {
+        if (V2?.[Symbol.toStringTag] !== I2.prototype[Symbol.toStringTag]) {
           const err = new TypeError("Illegal invocation");
           err.code = "ERR_INVALID_THIS";
           throw err;
@@ -3722,8 +3722,8 @@ var require_webidl = __commonJS({
         message: "Illegal constructor"
       });
     };
-    webidl.util.Type = function(V) {
-      switch (typeof V) {
+    webidl.util.Type = function(V2) {
+      switch (typeof V2) {
         case "undefined":
           return "Undefined";
         case "boolean":
@@ -3738,7 +3738,7 @@ var require_webidl = __commonJS({
           return "BigInt";
         case "function":
         case "object": {
-          if (V === null) {
+          if (V2 === null) {
             return "Null";
           }
           return "Object";
@@ -3747,7 +3747,7 @@ var require_webidl = __commonJS({
     };
     webidl.util.markAsUncloneable = markAsUncloneable || (() => {
     });
-    webidl.util.ConvertToInt = function(V, bitLength, signedness, opts) {
+    webidl.util.ConvertToInt = function(V2, bitLength, signedness, opts) {
       let upperBound;
       let lowerBound;
       if (bitLength === 64) {
@@ -3764,7 +3764,7 @@ var require_webidl = __commonJS({
         lowerBound = Math.pow(-2, bitLength) - 1;
         upperBound = Math.pow(2, bitLength - 1) - 1;
       }
-      let x2 = Number(V);
+      let x2 = Number(V2);
       if (x2 === 0) {
         x2 = 0;
       }
@@ -3772,7 +3772,7 @@ var require_webidl = __commonJS({
         if (Number.isNaN(x2) || x2 === Number.POSITIVE_INFINITY || x2 === Number.NEGATIVE_INFINITY) {
           throw webidl.errors.exception({
             header: "Integer conversion",
-            message: `Could not convert ${webidl.util.Stringify(V)} to an integer.`
+            message: `Could not convert ${webidl.util.Stringify(V2)} to an integer.`
           });
         }
         x2 = webidl.util.IntegerPart(x2);
@@ -3810,28 +3810,28 @@ var require_webidl = __commonJS({
       }
       return r;
     };
-    webidl.util.Stringify = function(V) {
-      const type2 = webidl.util.Type(V);
+    webidl.util.Stringify = function(V2) {
+      const type2 = webidl.util.Type(V2);
       switch (type2) {
         case "Symbol":
-          return `Symbol(${V.description})`;
+          return `Symbol(${V2.description})`;
         case "Object":
-          return inspect(V);
+          return inspect(V2);
         case "String":
-          return `"${V}"`;
+          return `"${V2}"`;
         default:
-          return `${V}`;
+          return `${V2}`;
       }
     };
     webidl.sequenceConverter = function(converter) {
-      return (V, prefix, argument, Iterable) => {
-        if (webidl.util.Type(V) !== "Object") {
+      return (V2, prefix, argument, Iterable) => {
+        if (webidl.util.Type(V2) !== "Object") {
           throw webidl.errors.exception({
             header: prefix,
-            message: `${argument} (${webidl.util.Stringify(V)}) is not iterable.`
+            message: `${argument} (${webidl.util.Stringify(V2)}) is not iterable.`
           });
         }
-        const method = typeof Iterable === "function" ? Iterable() : V?.[Symbol.iterator]?.();
+        const method = typeof Iterable === "function" ? Iterable() : V2?.[Symbol.iterator]?.();
         const seq2 = [];
         let index = 0;
         if (method === void 0 || typeof method.next !== "function") {
@@ -3881,14 +3881,14 @@ var require_webidl = __commonJS({
       };
     };
     webidl.interfaceConverter = function(i) {
-      return (V, prefix, argument, opts) => {
-        if (opts?.strict !== false && !(V instanceof i)) {
+      return (V2, prefix, argument, opts) => {
+        if (opts?.strict !== false && !(V2 instanceof i)) {
           throw webidl.errors.exception({
             header: prefix,
-            message: `Expected ${argument} ("${webidl.util.Stringify(V)}") to be an instance of ${i.name}.`
+            message: `Expected ${argument} ("${webidl.util.Stringify(V2)}") to be an instance of ${i.name}.`
           });
         }
-        return V;
+        return V2;
       };
     };
     webidl.dictionaryConverter = function(converters) {
@@ -3933,27 +3933,27 @@ var require_webidl = __commonJS({
       };
     };
     webidl.nullableConverter = function(converter) {
-      return (V, prefix, argument) => {
-        if (V === null) {
-          return V;
+      return (V2, prefix, argument) => {
+        if (V2 === null) {
+          return V2;
         }
-        return converter(V, prefix, argument);
+        return converter(V2, prefix, argument);
       };
     };
-    webidl.converters.DOMString = function(V, prefix, argument, opts) {
-      if (V === null && opts?.legacyNullToEmptyString) {
+    webidl.converters.DOMString = function(V2, prefix, argument, opts) {
+      if (V2 === null && opts?.legacyNullToEmptyString) {
         return "";
       }
-      if (typeof V === "symbol") {
+      if (typeof V2 === "symbol") {
         throw webidl.errors.exception({
           header: prefix,
           message: `${argument} is a symbol, which cannot be converted to a DOMString.`
         });
       }
-      return String(V);
+      return String(V2);
     };
-    webidl.converters.ByteString = function(V, prefix, argument) {
-      const x2 = webidl.converters.DOMString(V, prefix, argument);
+    webidl.converters.ByteString = function(V2, prefix, argument) {
+      const x2 = webidl.converters.DOMString(V2, prefix, argument);
       for (let index = 0; index < x2.length; index++) {
         if (x2.charCodeAt(index) > 255) {
           throw new TypeError(
@@ -3964,107 +3964,107 @@ var require_webidl = __commonJS({
       return x2;
     };
     webidl.converters.USVString = toUSVString;
-    webidl.converters.boolean = function(V) {
-      const x2 = Boolean(V);
+    webidl.converters.boolean = function(V2) {
+      const x2 = Boolean(V2);
       return x2;
     };
-    webidl.converters.any = function(V) {
-      return V;
+    webidl.converters.any = function(V2) {
+      return V2;
     };
-    webidl.converters["long long"] = function(V, prefix, argument) {
-      const x2 = webidl.util.ConvertToInt(V, 64, "signed", void 0, prefix, argument);
+    webidl.converters["long long"] = function(V2, prefix, argument) {
+      const x2 = webidl.util.ConvertToInt(V2, 64, "signed", void 0, prefix, argument);
       return x2;
     };
-    webidl.converters["unsigned long long"] = function(V, prefix, argument) {
-      const x2 = webidl.util.ConvertToInt(V, 64, "unsigned", void 0, prefix, argument);
+    webidl.converters["unsigned long long"] = function(V2, prefix, argument) {
+      const x2 = webidl.util.ConvertToInt(V2, 64, "unsigned", void 0, prefix, argument);
       return x2;
     };
-    webidl.converters["unsigned long"] = function(V, prefix, argument) {
-      const x2 = webidl.util.ConvertToInt(V, 32, "unsigned", void 0, prefix, argument);
+    webidl.converters["unsigned long"] = function(V2, prefix, argument) {
+      const x2 = webidl.util.ConvertToInt(V2, 32, "unsigned", void 0, prefix, argument);
       return x2;
     };
-    webidl.converters["unsigned short"] = function(V, prefix, argument, opts) {
-      const x2 = webidl.util.ConvertToInt(V, 16, "unsigned", opts, prefix, argument);
+    webidl.converters["unsigned short"] = function(V2, prefix, argument, opts) {
+      const x2 = webidl.util.ConvertToInt(V2, 16, "unsigned", opts, prefix, argument);
       return x2;
     };
-    webidl.converters.ArrayBuffer = function(V, prefix, argument, opts) {
-      if (webidl.util.Type(V) !== "Object" || !types.isAnyArrayBuffer(V)) {
+    webidl.converters.ArrayBuffer = function(V2, prefix, argument, opts) {
+      if (webidl.util.Type(V2) !== "Object" || !types.isAnyArrayBuffer(V2)) {
         throw webidl.errors.conversionFailed({
           prefix,
-          argument: `${argument} ("${webidl.util.Stringify(V)}")`,
+          argument: `${argument} ("${webidl.util.Stringify(V2)}")`,
           types: ["ArrayBuffer"]
         });
       }
-      if (opts?.allowShared === false && types.isSharedArrayBuffer(V)) {
+      if (opts?.allowShared === false && types.isSharedArrayBuffer(V2)) {
         throw webidl.errors.exception({
           header: "ArrayBuffer",
           message: "SharedArrayBuffer is not allowed."
         });
       }
-      if (V.resizable || V.growable) {
+      if (V2.resizable || V2.growable) {
         throw webidl.errors.exception({
           header: "ArrayBuffer",
           message: "Received a resizable ArrayBuffer."
         });
       }
-      return V;
+      return V2;
     };
-    webidl.converters.TypedArray = function(V, T2, prefix, name, opts) {
-      if (webidl.util.Type(V) !== "Object" || !types.isTypedArray(V) || V.constructor.name !== T2.name) {
+    webidl.converters.TypedArray = function(V2, T2, prefix, name, opts) {
+      if (webidl.util.Type(V2) !== "Object" || !types.isTypedArray(V2) || V2.constructor.name !== T2.name) {
         throw webidl.errors.conversionFailed({
           prefix,
-          argument: `${name} ("${webidl.util.Stringify(V)}")`,
+          argument: `${name} ("${webidl.util.Stringify(V2)}")`,
           types: [T2.name]
         });
       }
-      if (opts?.allowShared === false && types.isSharedArrayBuffer(V.buffer)) {
+      if (opts?.allowShared === false && types.isSharedArrayBuffer(V2.buffer)) {
         throw webidl.errors.exception({
           header: "ArrayBuffer",
           message: "SharedArrayBuffer is not allowed."
         });
       }
-      if (V.buffer.resizable || V.buffer.growable) {
+      if (V2.buffer.resizable || V2.buffer.growable) {
         throw webidl.errors.exception({
           header: "ArrayBuffer",
           message: "Received a resizable ArrayBuffer."
         });
       }
-      return V;
+      return V2;
     };
-    webidl.converters.DataView = function(V, prefix, name, opts) {
-      if (webidl.util.Type(V) !== "Object" || !types.isDataView(V)) {
+    webidl.converters.DataView = function(V2, prefix, name, opts) {
+      if (webidl.util.Type(V2) !== "Object" || !types.isDataView(V2)) {
         throw webidl.errors.exception({
           header: prefix,
           message: `${name} is not a DataView.`
         });
       }
-      if (opts?.allowShared === false && types.isSharedArrayBuffer(V.buffer)) {
+      if (opts?.allowShared === false && types.isSharedArrayBuffer(V2.buffer)) {
         throw webidl.errors.exception({
           header: "ArrayBuffer",
           message: "SharedArrayBuffer is not allowed."
         });
       }
-      if (V.buffer.resizable || V.buffer.growable) {
+      if (V2.buffer.resizable || V2.buffer.growable) {
         throw webidl.errors.exception({
           header: "ArrayBuffer",
           message: "Received a resizable ArrayBuffer."
         });
       }
-      return V;
+      return V2;
     };
-    webidl.converters.BufferSource = function(V, prefix, name, opts) {
-      if (types.isAnyArrayBuffer(V)) {
-        return webidl.converters.ArrayBuffer(V, prefix, name, { ...opts, allowShared: false });
+    webidl.converters.BufferSource = function(V2, prefix, name, opts) {
+      if (types.isAnyArrayBuffer(V2)) {
+        return webidl.converters.ArrayBuffer(V2, prefix, name, { ...opts, allowShared: false });
       }
-      if (types.isTypedArray(V)) {
-        return webidl.converters.TypedArray(V, V.constructor, prefix, name, { ...opts, allowShared: false });
+      if (types.isTypedArray(V2)) {
+        return webidl.converters.TypedArray(V2, V2.constructor, prefix, name, { ...opts, allowShared: false });
       }
-      if (types.isDataView(V)) {
-        return webidl.converters.DataView(V, prefix, name, { ...opts, allowShared: false });
+      if (types.isDataView(V2)) {
+        return webidl.converters.DataView(V2, prefix, name, { ...opts, allowShared: false });
       }
       throw webidl.errors.conversionFailed({
         prefix,
-        argument: `${name} ("${webidl.util.Stringify(V)}")`,
+        argument: `${name} ("${webidl.util.Stringify(V2)}")`,
         types: ["BufferSource"]
       });
     };
@@ -12148,19 +12148,19 @@ var require_headers = __commonJS({
         enumerable: false
       }
     });
-    webidl.converters.HeadersInit = function(V, prefix, argument) {
-      if (webidl.util.Type(V) === "Object") {
-        const iterator2 = Reflect.get(V, Symbol.iterator);
-        if (!util.types.isProxy(V) && iterator2 === Headers2.prototype.entries) {
+    webidl.converters.HeadersInit = function(V2, prefix, argument) {
+      if (webidl.util.Type(V2) === "Object") {
+        const iterator2 = Reflect.get(V2, Symbol.iterator);
+        if (!util.types.isProxy(V2) && iterator2 === Headers2.prototype.entries) {
           try {
-            return getHeadersList(V).entriesList;
+            return getHeadersList(V2).entriesList;
           } catch {
           }
         }
         if (typeof iterator2 === "function") {
-          return webidl.converters["sequence<sequence<ByteString>>"](V, prefix, argument, iterator2.bind(V));
+          return webidl.converters["sequence<sequence<ByteString>>"](V2, prefix, argument, iterator2.bind(V2));
         }
-        return webidl.converters["record<ByteString, ByteString>"](V, prefix, argument);
+        return webidl.converters["record<ByteString, ByteString>"](V2, prefix, argument);
       }
       throw webidl.errors.conversionFailed({
         prefix: "Headers constructor",
@@ -12525,32 +12525,32 @@ var require_response = __commonJS({
     webidl.converters.URLSearchParams = webidl.interfaceConverter(
       URLSearchParams
     );
-    webidl.converters.XMLHttpRequestBodyInit = function(V, prefix, name) {
-      if (typeof V === "string") {
-        return webidl.converters.USVString(V, prefix, name);
+    webidl.converters.XMLHttpRequestBodyInit = function(V2, prefix, name) {
+      if (typeof V2 === "string") {
+        return webidl.converters.USVString(V2, prefix, name);
       }
-      if (isBlobLike(V)) {
-        return webidl.converters.Blob(V, prefix, name, { strict: false });
+      if (isBlobLike(V2)) {
+        return webidl.converters.Blob(V2, prefix, name, { strict: false });
       }
-      if (ArrayBuffer.isView(V) || types.isArrayBuffer(V)) {
-        return webidl.converters.BufferSource(V, prefix, name);
+      if (ArrayBuffer.isView(V2) || types.isArrayBuffer(V2)) {
+        return webidl.converters.BufferSource(V2, prefix, name);
       }
-      if (util.isFormDataLike(V)) {
-        return webidl.converters.FormData(V, prefix, name, { strict: false });
+      if (util.isFormDataLike(V2)) {
+        return webidl.converters.FormData(V2, prefix, name, { strict: false });
       }
-      if (V instanceof URLSearchParams) {
-        return webidl.converters.URLSearchParams(V, prefix, name);
+      if (V2 instanceof URLSearchParams) {
+        return webidl.converters.URLSearchParams(V2, prefix, name);
       }
-      return webidl.converters.DOMString(V, prefix, name);
+      return webidl.converters.DOMString(V2, prefix, name);
     };
-    webidl.converters.BodyInit = function(V, prefix, argument) {
-      if (V instanceof ReadableStream) {
-        return webidl.converters.ReadableStream(V, prefix, argument);
+    webidl.converters.BodyInit = function(V2, prefix, argument) {
+      if (V2 instanceof ReadableStream) {
+        return webidl.converters.ReadableStream(V2, prefix, argument);
       }
-      if (V?.[Symbol.asyncIterator]) {
-        return V;
+      if (V2?.[Symbol.asyncIterator]) {
+        return V2;
       }
-      return webidl.converters.XMLHttpRequestBodyInit(V, prefix, argument);
+      return webidl.converters.XMLHttpRequestBodyInit(V2, prefix, argument);
     };
     webidl.converters.ResponseInit = webidl.dictionaryConverter([
       {
@@ -13219,14 +13219,14 @@ var require_request2 = __commonJS({
     webidl.converters.Request = webidl.interfaceConverter(
       Request
     );
-    webidl.converters.RequestInfo = function(V, prefix, argument) {
-      if (typeof V === "string") {
-        return webidl.converters.USVString(V, prefix, argument);
+    webidl.converters.RequestInfo = function(V2, prefix, argument) {
+      if (typeof V2 === "string") {
+        return webidl.converters.USVString(V2, prefix, argument);
       }
-      if (V instanceof Request) {
-        return webidl.converters.Request(V, prefix, argument);
+      if (V2 instanceof Request) {
+        return webidl.converters.Request(V2, prefix, argument);
       }
-      return webidl.converters.USVString(V, prefix, argument);
+      return webidl.converters.USVString(V2, prefix, argument);
     };
     webidl.converters.AbortSignal = webidl.interfaceConverter(
       AbortSignal
@@ -17882,11 +17882,11 @@ var require_websocket = __commonJS({
     webidl.converters["sequence<DOMString>"] = webidl.sequenceConverter(
       webidl.converters.DOMString
     );
-    webidl.converters["DOMString or sequence<DOMString>"] = function(V, prefix, argument) {
-      if (webidl.util.Type(V) === "Object" && Symbol.iterator in V) {
-        return webidl.converters["sequence<DOMString>"](V);
+    webidl.converters["DOMString or sequence<DOMString>"] = function(V2, prefix, argument) {
+      if (webidl.util.Type(V2) === "Object" && Symbol.iterator in V2) {
+        return webidl.converters["sequence<DOMString>"](V2);
       }
-      return webidl.converters.DOMString(V, prefix, argument);
+      return webidl.converters.DOMString(V2, prefix, argument);
     };
     webidl.converters.WebSocketInit = webidl.dictionaryConverter([
       {
@@ -17904,22 +17904,22 @@ var require_websocket = __commonJS({
         converter: webidl.nullableConverter(webidl.converters.HeadersInit)
       }
     ]);
-    webidl.converters["DOMString or sequence<DOMString> or WebSocketInit"] = function(V) {
-      if (webidl.util.Type(V) === "Object" && !(Symbol.iterator in V)) {
-        return webidl.converters.WebSocketInit(V);
+    webidl.converters["DOMString or sequence<DOMString> or WebSocketInit"] = function(V2) {
+      if (webidl.util.Type(V2) === "Object" && !(Symbol.iterator in V2)) {
+        return webidl.converters.WebSocketInit(V2);
       }
-      return { protocols: webidl.converters["DOMString or sequence<DOMString>"](V) };
+      return { protocols: webidl.converters["DOMString or sequence<DOMString>"](V2) };
     };
-    webidl.converters.WebSocketSendData = function(V) {
-      if (webidl.util.Type(V) === "Object") {
-        if (isBlobLike(V)) {
-          return webidl.converters.Blob(V, { strict: false });
+    webidl.converters.WebSocketSendData = function(V2) {
+      if (webidl.util.Type(V2) === "Object") {
+        if (isBlobLike(V2)) {
+          return webidl.converters.Blob(V2, { strict: false });
         }
-        if (ArrayBuffer.isView(V) || types.isArrayBuffer(V)) {
-          return webidl.converters.BufferSource(V);
+        if (ArrayBuffer.isView(V2) || types.isArrayBuffer(V2)) {
+          return webidl.converters.BufferSource(V2);
         }
       }
-      return webidl.converters.USVString(V);
+      return webidl.converters.USVString(V2);
     };
     function onParserDrain() {
       this.ws[kResponse].socket.resume();
@@ -20216,8 +20216,8 @@ var require_each = __commonJS({
           } else if (typeof Symbol === "function" && context3[Symbol.iterator]) {
             var newContext = [];
             var iterator2 = context3[Symbol.iterator]();
-            for (var it2 = iterator2.next(); !it2.done; it2 = iterator2.next()) {
-              newContext.push(it2.value);
+            for (var it = iterator2.next(); !it.done; it = iterator2.next()) {
+              newContext.push(it.value);
             }
             context3 = newContext;
             for (var j2 = context3.length; i < j2; i++) {
@@ -20430,7 +20430,7 @@ var require_helpers = __commonJS({
       if (instance.helpers[helperName]) {
         instance.hooks[helperName] = instance.helpers[helperName];
         if (!keepHelper) {
-          delete instance.helpers[helperName];
+          instance.helpers[helperName] = void 0;
         }
       }
     }
@@ -20522,22 +20522,6 @@ var require_logger = __commonJS({
   }
 });
 
-// node_modules/handlebars/dist/cjs/handlebars/internal/create-new-lookup-object.js
-var require_create_new_lookup_object = __commonJS({
-  "node_modules/handlebars/dist/cjs/handlebars/internal/create-new-lookup-object.js"(exports2) {
-    "use strict";
-    exports2.__esModule = true;
-    exports2.createNewLookupObject = createNewLookupObject;
-    var _utils = require_utils2();
-    function createNewLookupObject() {
-      for (var _len = arguments.length, sources = Array(_len), _key = 0; _key < _len; _key++) {
-        sources[_key] = arguments[_key];
-      }
-      return _utils.extend.apply(void 0, [/* @__PURE__ */ Object.create(null)].concat(sources));
-    }
-  }
-});
-
 // node_modules/handlebars/dist/cjs/handlebars/internal/proto-access.js
 var require_proto_access = __commonJS({
   "node_modules/handlebars/dist/cjs/handlebars/internal/proto-access.js"(exports2) {
@@ -20549,25 +20533,28 @@ var require_proto_access = __commonJS({
     function _interopRequireDefault(obj) {
       return obj && obj.__esModule ? obj : { "default": obj };
     }
-    var _createNewLookupObject = require_create_new_lookup_object();
+    var _utils = require_utils2();
     var _logger = require_logger();
     var _logger2 = _interopRequireDefault(_logger);
     var loggedProperties = /* @__PURE__ */ Object.create(null);
     function createProtoAccessControl(runtimeOptions) {
-      var defaultMethodWhiteList = /* @__PURE__ */ Object.create(null);
-      defaultMethodWhiteList["constructor"] = false;
-      defaultMethodWhiteList["__defineGetter__"] = false;
-      defaultMethodWhiteList["__defineSetter__"] = false;
-      defaultMethodWhiteList["__lookupGetter__"] = false;
-      var defaultPropertyWhiteList = /* @__PURE__ */ Object.create(null);
-      defaultPropertyWhiteList["__proto__"] = false;
+      var propertyWhiteList = /* @__PURE__ */ Object.create(null);
+      propertyWhiteList["__proto__"] = false;
+      _utils.extend(propertyWhiteList, runtimeOptions.allowedProtoProperties);
+      var methodWhiteList = /* @__PURE__ */ Object.create(null);
+      methodWhiteList["constructor"] = false;
+      methodWhiteList["__defineGetter__"] = false;
+      methodWhiteList["__defineSetter__"] = false;
+      methodWhiteList["__lookupGetter__"] = false;
+      methodWhiteList["__lookupSetter__"] = false;
+      _utils.extend(methodWhiteList, runtimeOptions.allowedProtoMethods);
       return {
         properties: {
-          whitelist: _createNewLookupObject.createNewLookupObject(defaultPropertyWhiteList, runtimeOptions.allowedProtoProperties),
+          whitelist: propertyWhiteList,
           defaultValue: runtimeOptions.allowProtoPropertiesByDefault
         },
         methods: {
-          whitelist: _createNewLookupObject.createNewLookupObject(defaultMethodWhiteList, runtimeOptions.allowedProtoMethods),
+          whitelist: methodWhiteList,
           defaultValue: runtimeOptions.allowProtoMethodsByDefault
         }
       };
@@ -20620,7 +20607,7 @@ var require_base = __commonJS({
     var _logger = require_logger();
     var _logger2 = _interopRequireDefault(_logger);
     var _internalProtoAccess = require_proto_access();
-    var VERSION7 = "4.7.8";
+    var VERSION7 = "4.7.9";
     exports2.VERSION = VERSION7;
     var COMPILER_REVISION = 8;
     exports2.COMPILER_REVISION = COMPILER_REVISION;
@@ -20806,14 +20793,12 @@ var require_runtime = __commonJS({
           }
         }
         partial = env.VM.resolvePartial.call(this, partial, context3, options);
-        var extendedOptions = Utils.extend({}, options, {
-          hooks: this.hooks,
-          protoAccessControl: this.protoAccessControl
-        });
-        var result = env.VM.invokePartial.call(this, partial, context3, extendedOptions);
+        options.hooks = this.hooks;
+        options.protoAccessControl = this.protoAccessControl;
+        var result = env.VM.invokePartial.call(this, partial, context3, options);
         if (result == null && env.compile) {
           options.partials[options.name] = env.compile(partial, templateSpec.compilerOptions, env);
-          result = options.partials[options.name](context3, extendedOptions);
+          result = options.partials[options.name](context3, options);
         }
         if (result != null) {
           if (options.indent) {
@@ -20858,7 +20843,7 @@ var require_runtime = __commonJS({
           for (var i = 0; i < len; i++) {
             var result = depths[i] && container.lookupProperty(depths[i], name);
             if (result != null) {
-              return depths[i][name];
+              return result;
             }
           }
         },
@@ -20924,8 +20909,9 @@ var require_runtime = __commonJS({
       ret.isTop = true;
       ret._setup = function(options) {
         if (!options.partial) {
-          var mergedHelpers = Utils.extend({}, env.helpers, options.helpers);
-          wrapHelpersToPassLookupProperty(mergedHelpers, container);
+          var mergedHelpers = {};
+          addHelpers(mergedHelpers, env.helpers, container);
+          addHelpers(mergedHelpers, options.helpers, container);
           container.helpers = mergedHelpers;
           if (templateSpec.usePartial) {
             container.partials = container.mergeIfNeeded(options.partials, env.partials);
@@ -20975,18 +20961,18 @@ var require_runtime = __commonJS({
     function resolvePartial(partial, context3, options) {
       if (!partial) {
         if (options.name === "@partial-block") {
-          partial = options.data["partial-block"];
+          partial = lookupOwnProperty(options.data, "partial-block");
         } else {
-          partial = options.partials[options.name];
+          partial = lookupOwnProperty(options.partials, options.name);
         }
       } else if (!partial.call && !options.name) {
         options.name = partial;
-        partial = options.partials[partial];
+        partial = lookupOwnProperty(options.partials, partial);
       }
       return partial;
     }
     function invokePartial(partial, context3, options) {
-      var currentPartialBlock = options.data && options.data["partial-block"];
+      var currentPartialBlock = lookupOwnProperty(options.data, "partial-block");
       options.partial = true;
       if (options.ids) {
         options.data.contextPath = options.ids[0] || options.data.contextPath;
@@ -21019,6 +21005,11 @@ var require_runtime = __commonJS({
     function noop3() {
       return "";
     }
+    function lookupOwnProperty(obj, name) {
+      if (obj && Object.prototype.hasOwnProperty.call(obj, name)) {
+        return obj[name];
+      }
+    }
     function initData(context3, data) {
       if (!data || !("root" in data)) {
         data = data ? _base.createFrame(data) : {};
@@ -21034,16 +21025,18 @@ var require_runtime = __commonJS({
       }
       return prog;
     }
-    function wrapHelpersToPassLookupProperty(mergedHelpers, container) {
-      Object.keys(mergedHelpers).forEach(function(helperName) {
-        var helper = mergedHelpers[helperName];
+    function addHelpers(mergedHelpers, helpers, container) {
+      if (!helpers) return;
+      Object.keys(helpers).forEach(function(helperName) {
+        var helper = helpers[helperName];
         mergedHelpers[helperName] = passLookupPropertyOption(helper, container);
       });
     }
     function passLookupPropertyOption(helper, container) {
       var lookupProperty = container.lookupProperty;
       return _internalWrapHelper.wrapHelper(helper, function(options) {
-        return Utils.extend({ lookupProperty }, options);
+        options.lookupProperty = lookupProperty;
+        return options;
       });
     }
   }
@@ -21853,7 +21846,7 @@ var require_parser = __commonJS({
               break;
           }
         };
-        lexer2.rules = [/^(?:[^\x00]*?(?=(\{\{)))/, /^(?:[^\x00]+)/, /^(?:[^\x00]{2,}?(?=(\{\{|\\\{\{|\\\\\{\{|$)))/, /^(?:\{\{\{\{(?=[^/]))/, /^(?:\{\{\{\{\/[^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=[=}\s\/.])\}\}\}\})/, /^(?:[^\x00]+?(?=(\{\{\{\{)))/, /^(?:[\s\S]*?--(~)?\}\})/, /^(?:\()/, /^(?:\))/, /^(?:\{\{\{\{)/, /^(?:\}\}\}\})/, /^(?:\{\{(~)?>)/, /^(?:\{\{(~)?#>)/, /^(?:\{\{(~)?#\*?)/, /^(?:\{\{(~)?\/)/, /^(?:\{\{(~)?\^\s*(~)?\}\})/, /^(?:\{\{(~)?\s*else\s*(~)?\}\})/, /^(?:\{\{(~)?\^)/, /^(?:\{\{(~)?\s*else\b)/, /^(?:\{\{(~)?\{)/, /^(?:\{\{(~)?&)/, /^(?:\{\{(~)?!--)/, /^(?:\{\{(~)?![\s\S]*?\}\})/, /^(?:\{\{(~)?\*?)/, /^(?:=)/, /^(?:\.\.)/, /^(?:\.(?=([=~}\s\/.)|])))/, /^(?:[\/.])/, /^(?:\s+)/, /^(?:\}(~)?\}\})/, /^(?:(~)?\}\})/, /^(?:"(\\["]|[^"])*")/, /^(?:'(\\[']|[^'])*')/, /^(?:@)/, /^(?:true(?=([~}\s)])))/, /^(?:false(?=([~}\s)])))/, /^(?:undefined(?=([~}\s)])))/, /^(?:null(?=([~}\s)])))/, /^(?:-?[0-9]+(?:\.[0-9]+)?(?=([~}\s)])))/, /^(?:as\s+\|)/, /^(?:\|)/, /^(?:([^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=([=~}\s\/.)|]))))/, /^(?:\[(\\\]|[^\]])*\])/, /^(?:.)/, /^(?:$)/];
+        lexer2.rules = [/^(?:[^\x00]*?(?=(\{\{)))/, /^(?:[^\x00]+)/, /^(?:[^\x00]{2,}?(?=(\{\{|\\\{\{|\\\\\{\{|$)))/, /^(?:\{\{\{\{(?=[^\/]))/, /^(?:\{\{\{\{\/[^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=[=}\s\/.])\}\}\}\})/, /^(?:[^\x00]+?(?=(\{\{\{\{)))/, /^(?:[\s\S]*?--(~)?\}\})/, /^(?:\()/, /^(?:\))/, /^(?:\{\{\{\{)/, /^(?:\}\}\}\})/, /^(?:\{\{(~)?>)/, /^(?:\{\{(~)?#>)/, /^(?:\{\{(~)?#\*?)/, /^(?:\{\{(~)?\/)/, /^(?:\{\{(~)?\^\s*(~)?\}\})/, /^(?:\{\{(~)?\s*else\s*(~)?\}\})/, /^(?:\{\{(~)?\^)/, /^(?:\{\{(~)?\s*else\b)/, /^(?:\{\{(~)?\{)/, /^(?:\{\{(~)?&)/, /^(?:\{\{(~)?!--)/, /^(?:\{\{(~)?![\s\S]*?\}\})/, /^(?:\{\{(~)?\*?)/, /^(?:=)/, /^(?:\.\.)/, /^(?:\.(?=([=~}\s\/.)|])))/, /^(?:[\/.])/, /^(?:\s+)/, /^(?:\}(~)?\}\})/, /^(?:(~)?\}\})/, /^(?:"(\\["]|[^"])*")/, /^(?:'(\\[']|[^'])*')/, /^(?:@)/, /^(?:true(?=([~}\s)])))/, /^(?:false(?=([~}\s)])))/, /^(?:undefined(?=([~}\s)])))/, /^(?:null(?=([~}\s)])))/, /^(?:-?[0-9]+(?:\.[0-9]+)?(?=([~}\s)])))/, /^(?:as\s+\|)/, /^(?:\|)/, /^(?:([^\s!"#%-,\.\/;->@\[-\^`\{-~]+(?=([=~}\s\/.)|]))))/, /^(?:\[(\\\]|[^\]])*\])/, /^(?:.)/, /^(?:$)/];
         lexer2.conditions = { "mu": { "rules": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44], "inclusive": false }, "emu": { "rules": [2], "inclusive": false }, "com": { "rules": [6], "inclusive": false }, "raw": { "rules": [3, 4, 5], "inclusive": false }, "INITIAL": { "rules": [0, 1, 44], "inclusive": true } };
         return lexer2;
       })();
@@ -22360,12 +22353,15 @@ var require_base2 = __commonJS({
     var _whitespaceControl2 = _interopRequireDefault(_whitespaceControl);
     var _helpers = require_helpers2();
     var Helpers = _interopRequireWildcard(_helpers);
+    var _exception = require_exception();
+    var _exception2 = _interopRequireDefault(_exception);
     var _utils = require_utils2();
     exports2.parser = _parser2["default"];
     var yy = {};
     _utils.extend(yy, Helpers);
     function parseWithoutProcessing(input, options) {
       if (input.type === "Program") {
+        validateInputAst(input);
         return input;
       }
       _parser2["default"].yy = yy;
@@ -22379,6 +22375,51 @@ var require_base2 = __commonJS({
       var ast = parseWithoutProcessing(input, options);
       var strip = new _whitespaceControl2["default"](options);
       return strip.accept(ast);
+    }
+    function validateInputAst(ast) {
+      validateAstNode(ast);
+    }
+    function validateAstNode(node) {
+      if (node == null) {
+        return;
+      }
+      if (Array.isArray(node)) {
+        node.forEach(validateAstNode);
+        return;
+      }
+      if (typeof node !== "object") {
+        return;
+      }
+      if (node.type === "PathExpression") {
+        if (!isValidDepth(node.depth)) {
+          throw new _exception2["default"]("Invalid AST: PathExpression.depth must be an integer");
+        }
+        if (!Array.isArray(node.parts)) {
+          throw new _exception2["default"]("Invalid AST: PathExpression.parts must be an array");
+        }
+        for (var i = 0; i < node.parts.length; i++) {
+          if (typeof node.parts[i] !== "string") {
+            throw new _exception2["default"]("Invalid AST: PathExpression.parts must only contain strings");
+          }
+        }
+      } else if (node.type === "NumberLiteral") {
+        if (typeof node.value !== "number" || !isFinite(node.value)) {
+          throw new _exception2["default"]("Invalid AST: NumberLiteral.value must be a number");
+        }
+      } else if (node.type === "BooleanLiteral") {
+        if (typeof node.value !== "boolean") {
+          throw new _exception2["default"]("Invalid AST: BooleanLiteral.value must be a boolean");
+        }
+      }
+      Object.keys(node).forEach(function(propertyName) {
+        if (propertyName === "loc") {
+          return;
+        }
+        validateAstNode(node[propertyName]);
+      });
+    }
+    function isValidDepth(depth) {
+      return typeof depth === "number" && isFinite(depth) && Math.floor(depth) === depth && depth >= 0;
     }
   }
 });
@@ -24808,12 +24849,10 @@ var require_javascript_compiler = __commonJS({
           var programs = _context.programs;
           var decorators = _context.decorators;
           for (i = 0, l = programs.length; i < l; i++) {
-            if (programs[i]) {
-              ret[i] = programs[i];
-              if (decorators[i]) {
-                ret[i + "_d"] = decorators[i];
-                ret.useDecorators = true;
-              }
+            ret[i] = programs[i];
+            if (decorators[i]) {
+              ret[i + "_d"] = decorators[i];
+              ret.useDecorators = true;
             }
           }
           if (this.environment.usePartial) {
@@ -25074,22 +25113,25 @@ var require_javascript_compiler = __commonJS({
         }
         this.resolvePath("data", parts, 0, true, strict);
       },
-      resolvePath: function resolvePath(type2, parts, i, falsy, strict) {
+      resolvePath: function resolvePath(type2, parts, startPartIndex, falsy, strict) {
         var _this2 = this;
         if (this.options.strict || this.options.assumeObjects) {
-          this.push(strictLookup(this.options.strict && strict, this, parts, i, type2));
+          this.push(strictLookup(this.options.strict && strict, this, parts, startPartIndex, type2));
           return;
         }
         var len = parts.length;
-        for (; i < len; i++) {
-          this.replaceStack(function(current) {
-            var lookup = _this2.nameLookup(current, parts[i], type2);
+        var _loop = function(i2) {
+          _this2.replaceStack(function(current) {
+            var lookup = _this2.nameLookup(current, parts[i2], type2);
             if (!falsy) {
               return [" != null ? ", lookup, " : ", current];
             } else {
               return [" && ", lookup];
             }
           });
+        };
+        for (var i = startPartIndex; i < len; i++) {
+          _loop(i);
         }
       },
       // [resolvePossibleLambda]
@@ -25193,7 +25235,9 @@ var require_javascript_compiler = __commonJS({
       // and inserts the decorator into the decorators list.
       registerDecorator: function registerDecorator(paramSize, name) {
         var foundDecorator = this.nameLookup("decorators", name, "decorator"), options = this.setupHelperArgs(name, paramSize);
-        this.decorators.push(["fn = ", this.decorators.functionCall(foundDecorator, "", ["fn", "props", "container", options]), " || fn;"]);
+        this.decorators.push(["var decorator = ", foundDecorator, ";"]);
+        this.decorators.push(['if (typeof decorator !== "function") { throw new Error(', this.quotedString('Missing decorator: "' + name + '"'), "); }"]);
+        this.decorators.push(["fn = ", this.decorators.functionCall("decorator", "", ["fn", "props", "container", options]), " || fn;"]);
       },
       // [invokeHelper]
       //
@@ -25340,8 +25384,7 @@ var require_javascript_compiler = __commonJS({
           compiler = new this.compiler();
           var existing = this.matchExistingProgram(child);
           if (existing == null) {
-            this.context.programs.push("");
-            var index = this.context.programs.length;
+            var index = this.context.programs.push("") - 1;
             child.index = index;
             child.name = "program" + index;
             this.context.programs[index] = compiler.compile(child, options, this.context, !this.precompile);
@@ -25585,16 +25628,16 @@ var require_javascript_compiler = __commonJS({
     JavaScriptCompiler.isValidJavaScriptVariableName = function(name) {
       return !JavaScriptCompiler.RESERVED_WORDS[name] && /^[a-zA-Z_$][0-9a-zA-Z_$]*$/.test(name);
     };
-    function strictLookup(requireTerminal, compiler, parts, i, type2) {
+    function strictLookup(requireTerminal, compiler, parts, startPartIndex, type2) {
       var stack = compiler.popStack(), len = parts.length;
       if (requireTerminal) {
         len--;
       }
-      for (; i < len; i++) {
+      for (var i = startPartIndex; i < len; i++) {
         stack = compiler.nameLookup(stack, parts[i], type2);
       }
       if (requireTerminal) {
-        return [compiler.aliasable("container.strict"), "(", stack, ", ", compiler.quotedString(parts[i]), ", ", JSON.stringify(compiler.source.currentLocation), " )"];
+        return [compiler.aliasable("container.strict"), "(", stack, ", ", compiler.quotedString(parts[len]), ", ", JSON.stringify(compiler.source.currentLocation), " )"];
       } else {
         return stack;
       }
@@ -32757,7 +32800,7 @@ function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) 
     action: payload.action || "",
     hasAsanaTasks
   };
-  if (eventName === "pull_request") {
+  if (eventName === "pull_request" || eventName === "pull_request_review") {
     const pr = payload.pull_request;
     if (!pr) {
       throw new Error("No pull_request in GitHub payload");
@@ -32774,6 +32817,9 @@ function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) 
       head_ref: pr.head.ref,
       url: pr.html_url || ""
     };
+    if (payload.review?.state) {
+      context3.review = { state: payload.review.state };
+    }
     if (payload.label) {
       context3.label = { name: payload.label.name };
     }
@@ -32801,7 +32847,9 @@ function buildRuleContext(githubContext, comments, hasAsanaTasks, userMappings) 
       context3.labels = issue2.labels.map((label) => label.name);
     }
   } else {
-    throw new Error(`Unsupported event: ${eventName}. Supported events: pull_request, issues`);
+    throw new Error(
+      `Unsupported event: ${eventName}. Supported events: pull_request, pull_request_review, issues`
+    );
   }
   if (comments !== void 0) {
     context3.comments = comments;
@@ -32833,6 +32881,15 @@ function matchesCondition(condition, context3) {
   }
   if (condition.label !== void 0) {
     if (!context3.label || condition.label !== context3.label.name) {
+      return false;
+    }
+  }
+  if (condition.review_state !== void 0) {
+    if (!context3.review) {
+      return false;
+    }
+    const states = Array.isArray(condition.review_state) ? condition.review_state : [condition.review_state];
+    if (!states.includes(context3.review.state)) {
       return false;
     }
   }
@@ -33594,7 +33651,7 @@ function M() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
 var T = M();
-function H(u3) {
+function G(u3) {
   T = u3;
 }
 var _ = { exec: () => null };
@@ -33605,88 +33662,85 @@ function k(u3, e = "") {
   }, getRegex: () => new RegExp(t, e) };
   return n;
 }
-var Re = (() => {
+var be = (() => {
   try {
     return !!new RegExp("(?<=1)(?<!1)");
   } catch {
     return false;
   }
 })();
-var m = { codeRemoveIndent: /^(?: {1,4}| {0,3}\t)/gm, outputLinkReplace: /\\([\[\]])/g, indentCodeCompensation: /^(\s+)(?:```)/, beginningSpace: /^\s+/, endingHash: /#$/, startingSpaceChar: /^ /, endingSpaceChar: / $/, nonSpaceChar: /[^ ]/, newLineCharGlobal: /\n/g, tabCharGlobal: /\t/g, multipleSpaceGlobal: /\s+/g, blankLine: /^[ \t]*$/, doubleBlankLine: /\n[ \t]*\n[ \t]*$/, blockquoteStart: /^ {0,3}>/, blockquoteSetextReplace: /\n {0,3}((?:=+|-+) *)(?=\n|$)/g, blockquoteSetextReplace2: /^ {0,3}>[ \t]?/gm, listReplaceNesting: /^ {1,4}(?=( {4})*[^ ])/g, listIsTask: /^\[[ xX]\] +\S/, listReplaceTask: /^\[[ xX]\] +/, listTaskCheckbox: /\[[ xX]\]/, anyLine: /\n.*\n/, hrefBrackets: /^<(.*)>$/, tableDelimiter: /[:|]/, tableAlignChars: /^\||\| *$/g, tableRowBlankLine: /\n[ \t]*$/, tableAlignRight: /^ *-+: *$/, tableAlignCenter: /^ *:-+: *$/, tableAlignLeft: /^ *:-+ *$/, startATag: /^<a /i, endATag: /^<\/a>/i, startPreScriptTag: /^<(pre|code|kbd|script)(\s|>)/i, endPreScriptTag: /^<\/(pre|code|kbd|script)(\s|>)/i, startAngleBracket: /^</, endAngleBracket: />$/, pedanticHrefTitle: /^([^'"]*[^\s])\s+(['"])(.*)\2/, unicodeAlphaNumeric: /[\p{L}\p{N}]/u, escapeTest: /[&<>"']/, escapeReplace: /[&<>"']/g, escapeTestNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/, escapeReplaceNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g, unescapeTest: /&(#(?:\d+)|(?:#x[0-9A-Fa-f]+)|(?:\w+));?/ig, caret: /(^|[^\[])\^/g, percentDecode: /%25/g, findPipe: /\|/g, splitPipe: / \|/, slashPipe: /\\\|/g, carriageReturn: /\r\n|\r/g, spaceLine: /^ +$/gm, notSpaceStart: /^\S*/, endingNewline: /\n$/, listItemRegex: (u3) => new RegExp(`^( {0,3}${u3})((?:[	 ][^\\n]*)?(?:\\n|$))`), nextBulletRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}(?:[*+-]|\\d{1,9}[.)])((?:[ 	][^\\n]*)?(?:\\n|$))`), hrRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}((?:- *){3,}|(?:_ *){3,}|(?:\\* *){3,})(?:\\n+|$)`), fencesBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}(?:\`\`\`|~~~)`), headingBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}#`), htmlBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}<(?:[a-z].*>|!--)`, "i"), blockquoteBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}>`) };
-var Te = /^(?:[ \t]*(?:\n|$))+/;
-var Oe = /^((?: {4}| {0,3}\t)[^\n]+(?:\n(?:[ \t]*(?:\n|$))*)?)+/;
-var we = /^ {0,3}(`{3,}(?=[^`\n]*(?:\n|$))|~{3,})([^\n]*)(?:\n|$)(?:|([\s\S]*?)(?:\n|$))(?: {0,3}\1[~`]* *(?=\n|$)|$)/;
-var I = /^ {0,3}((?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/;
-var ye = /^ {0,3}(#{1,6})(?=\s|$)(.*)(?:\n+|$)/;
-var N = / {0,3}(?:[*+-]|\d{1,9}[.)])/;
-var re = /^(?!bull |blockCode|fences|blockquote|heading|html|table)((?:.|\n(?!\s*?\n|bull |blockCode|fences|blockquote|heading|html|table))+?)\n {0,3}(=+|-+) *(?:\n+|$)/;
-var se = k(re).replace(/bull/g, N).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/\|table/g, "").getRegex();
-var Pe = k(re).replace(/bull/g, N).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/table/g, / {0,3}\|?(?:[:\- ]*\|)+[\:\- ]*\n/).getRegex();
-var Q = /^([^\n]+(?:\n(?!hr|heading|lheading|blockquote|fences|list|html|table| +\n)[^\n]+)*)/;
-var Se = /^[^\n]+/;
+var m = { codeRemoveIndent: /^(?: {1,4}| {0,3}\t)/gm, outputLinkReplace: /\\([\[\]])/g, indentCodeCompensation: /^(\s+)(?:```)/, beginningSpace: /^\s+/, endingHash: /#$/, startingSpaceChar: /^ /, endingSpaceChar: / $/, nonSpaceChar: /[^ ]/, newLineCharGlobal: /\n/g, tabCharGlobal: /\t/g, multipleSpaceGlobal: /\s+/g, blankLine: /^[ \t]*$/, doubleBlankLine: /\n[ \t]*\n[ \t]*$/, blockquoteStart: /^ {0,3}>/, blockquoteSetextReplace: /\n {0,3}((?:=+|-+) *)(?=\n|$)/g, blockquoteSetextReplace2: /^ {0,3}>[ \t]?/gm, listReplaceNesting: /^ {1,4}(?=( {4})*[^ ])/g, listIsTask: /^\[[ xX]\] +\S/, listReplaceTask: /^\[[ xX]\] +/, listTaskCheckbox: /\[[ xX]\]/, anyLine: /\n.*\n/, hrefBrackets: /^<(.*)>$/, tableDelimiter: /[:|]/, tableAlignChars: /^\||\| *$/g, tableRowBlankLine: /\n[ \t]*$/, tableAlignRight: /^ *-+: *$/, tableAlignCenter: /^ *:-+: *$/, tableAlignLeft: /^ *:-+ *$/, startATag: /^<a /i, endATag: /^<\/a>/i, startPreScriptTag: /^<(pre|code|kbd|script)(\s|>)/i, endPreScriptTag: /^<\/(pre|code|kbd|script)(\s|>)/i, startAngleBracket: /^</, endAngleBracket: />$/, pedanticHrefTitle: /^([^'"]*[^\s])\s+(['"])(.*)\2/, unicodeAlphaNumeric: /[\p{L}\p{N}]/u, escapeTest: /[&<>"']/, escapeReplace: /[&<>"']/g, escapeTestNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/, escapeReplaceNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g, caret: /(^|[^\[])\^/g, percentDecode: /%25/g, findPipe: /\|/g, splitPipe: / \|/, slashPipe: /\\\|/g, carriageReturn: /\r\n|\r/g, spaceLine: /^ +$/gm, notSpaceStart: /^\S*/, endingNewline: /\n$/, listItemRegex: (u3) => new RegExp(`^( {0,3}${u3})((?:[	 ][^\\n]*)?(?:\\n|$))`), nextBulletRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}(?:[*+-]|\\d{1,9}[.)])((?:[ 	][^\\n]*)?(?:\\n|$))`), hrRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}((?:- *){3,}|(?:_ *){3,}|(?:\\* *){3,})(?:\\n+|$)`), fencesBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}(?:\`\`\`|~~~)`), headingBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}#`), htmlBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}<(?:[a-z].*>|!--)`, "i"), blockquoteBeginRegex: (u3) => new RegExp(`^ {0,${Math.min(3, u3 - 1)}}>`) };
+var Re = /^(?:[ \t]*(?:\n|$))+/;
+var Te = /^((?: {4}| {0,3}\t)[^\n]+(?:\n(?:[ \t]*(?:\n|$))*)?)+/;
+var Oe = /^ {0,3}(`{3,}(?=[^`\n]*(?:\n|$))|~{3,})([^\n]*)(?:\n|$)(?:|([\s\S]*?)(?:\n|$))(?: {0,3}\1[~`]* *(?=\n|$)|$)/;
+var C = /^ {0,3}((?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/;
+var we = /^ {0,3}(#{1,6})(?=\s|$)(.*)(?:\n+|$)/;
+var Q = / {0,3}(?:[*+-]|\d{1,9}[.)])/;
+var se = /^(?!bull |blockCode|fences|blockquote|heading|html|table)((?:.|\n(?!\s*?\n|bull |blockCode|fences|blockquote|heading|html|table))+?)\n {0,3}(=+|-+) *(?:\n+|$)/;
+var ie = k(se).replace(/bull/g, Q).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/\|table/g, "").getRegex();
+var ye = k(se).replace(/bull/g, Q).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/table/g, / {0,3}\|?(?:[:\- ]*\|)+[\:\- ]*\n/).getRegex();
+var j = /^([^\n]+(?:\n(?!hr|heading|lheading|blockquote|fences|list|html|table| +\n)[^\n]+)*)/;
+var Pe = /^[^\n]+/;
 var F = /(?!\s*\])(?:\\[\s\S]|[^\[\]\\])+/;
-var $e = k(/^ {0,3}\[(label)\]: *(?:\n[ \t]*)?([^<\s][^\s]*|<.*?>)(?:(?: +(?:\n[ \t]*)?| *\n[ \t]*)(title))? *(?:\n+|$)/).replace("label", F).replace("title", /(?:"(?:\\"?|[^"\\])*"|'[^'\n]*(?:\n[^'\n]+)*\n?'|\([^()]*\))/).getRegex();
-var _e = k(/^(bull)([ \t][^\n]+?)?(?:\n|$)/).replace(/bull/g, N).getRegex();
-var q = "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
-var j = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
-var Le = k("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", j).replace("tag", q).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
-var ie = k(Q).replace("hr", I).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", q).getRegex();
-var Me = k(/^( {0,3}> ?(paragraph|[^\n]*)(?:\n|$))+/).replace("paragraph", ie).getRegex();
-var U = { blockquote: Me, code: Oe, def: $e, fences: we, heading: ye, hr: I, html: Le, lheading: se, list: _e, newline: Te, paragraph: ie, table: _, text: Se };
-var te = k("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", I).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", q).getRegex();
-var ze = { ...U, lheading: Pe, table: te, paragraph: k(Q).replace("hr", I).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", te).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", q).getRegex() };
-var Ce = { ...U, html: k(`^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))`).replace("comment", j).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: _, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: k(Q).replace("hr", I).replace("heading", ` *#{1,6} *[^
-]`).replace("lheading", se).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex() };
-var Ae = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
+var Se = k(/^ {0,3}\[(label)\]: *(?:\n[ \t]*)?([^<\s][^\s]*|<.*?>)(?:(?: +(?:\n[ \t]*)?| *\n[ \t]*)(title))? *(?:\n+|$)/).replace("label", F).replace("title", /(?:"(?:\\"?|[^"\\])*"|'[^'\n]*(?:\n[^'\n]+)*\n?'|\([^()]*\))/).getRegex();
+var $e = k(/^(bull)([ \t][^\n]+?)?(?:\n|$)/).replace(/bull/g, Q).getRegex();
+var v = "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+var U = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
+var _e = k("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", U).replace("tag", v).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
+var oe = k(j).replace("hr", C).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", v).getRegex();
+var Le = k(/^( {0,3}> ?(paragraph|[^\n]*)(?:\n|$))+/).replace("paragraph", oe).getRegex();
+var K = { blockquote: Le, code: Te, def: Se, fences: Oe, heading: we, hr: C, html: _e, lheading: ie, list: $e, newline: Re, paragraph: oe, table: _, text: Pe };
+var ne = k("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", C).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", v).getRegex();
+var Me = { ...K, lheading: ye, table: ne, paragraph: k(j).replace("hr", C).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", ne).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", "</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag", v).getRegex() };
+var ze = { ...K, html: k(`^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))`).replace("comment", U).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: _, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: k(j).replace("hr", C).replace("heading", ` *#{1,6} *[^
+]`).replace("lheading", ie).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex() };
+var Ee = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
 var Ie = /^(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/;
-var oe = /^( {2,}|\\)\n(?!\s*$)/;
-var Ee = /^(`+|[^`])(?:(?= {2,}\n)|[\s\S]*?(?:(?=[\\<!\[`*_]|\b_|$)|[^ ](?= {2,}\n)))/;
-var v = /[\p{P}\p{S}]/u;
-var K = /[\s\p{P}\p{S}]/u;
-var ae = /[^\s\p{P}\p{S}]/u;
-var Be = k(/^((?![*_])punctSpace)/, "u").replace(/punctSpace/g, K).getRegex();
+var ae = /^( {2,}|\\)\n(?!\s*$)/;
+var Ae = /^(`+|[^`])(?:(?= {2,}\n)|[\s\S]*?(?:(?=[\\<!\[`*_]|\b_|$)|[^ ](?= {2,}\n)))/;
+var z = /[\p{P}\p{S}]/u;
+var H = /[\s\p{P}\p{S}]/u;
+var W = /[^\s\p{P}\p{S}]/u;
+var Ce = k(/^((?![*_])punctSpace)/, "u").replace(/punctSpace/g, H).getRegex();
 var le = /(?!~)[\p{P}\p{S}]/u;
-var De = /(?!~)[\s\p{P}\p{S}]/u;
-var qe = /(?:[^\s\p{P}\p{S}]|~)/u;
-var ue = /(?![*_])[\p{P}\p{S}]/u;
-var ve = /(?![*_])[\s\p{P}\p{S}]/u;
-var Ge = /(?:[^\s\p{P}\p{S}]|[*_])/u;
-var He = k(/link|precode-code|html/, "g").replace("link", /\[(?:[^\[\]`]|(?<a>`+)[^`]+\k<a>(?!`))*?\]\((?:\\[\s\S]|[^\\\(\)]|\((?:\\[\s\S]|[^\\\(\)])*\))*\)/).replace("precode-", Re ? "(?<!`)()" : "(^^|[^`])").replace("code", /(?<b>`+)[^`]+\k<b>(?!`)/).replace("html", /<(?! )[^<>]*?>/).getRegex();
-var pe = /^(?:\*+(?:((?!\*)punct)|[^\s*]))|^_+(?:((?!_)punct)|([^\s_]))/;
-var Ze = k(pe, "u").replace(/punct/g, v).getRegex();
-var Ne = k(pe, "u").replace(/punct/g, le).getRegex();
-var ce = "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)punctSpace(\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|notPunctSpace(\\*+)(?=notPunctSpace)";
-var Qe = k(ce, "gu").replace(/notPunctSpace/g, ae).replace(/punctSpace/g, K).replace(/punct/g, v).getRegex();
-var Fe = k(ce, "gu").replace(/notPunctSpace/g, qe).replace(/punctSpace/g, De).replace(/punct/g, le).getRegex();
-var je = k("^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)punctSpace(_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)", "gu").replace(/notPunctSpace/g, ae).replace(/punctSpace/g, K).replace(/punct/g, v).getRegex();
-var Ue = k(/^~~?(?:((?!~)punct)|[^\s~])/, "u").replace(/punct/g, ue).getRegex();
-var Ke = "^[^~]+(?=[^~])|(?!~)punct(~~?)(?=[\\s]|$)|notPunctSpace(~~?)(?!~)(?=punctSpace|$)|(?!~)punctSpace(~~?)(?=notPunctSpace)|[\\s](~~?)(?!~)(?=punct)|(?!~)punct(~~?)(?!~)(?=punct)|notPunctSpace(~~?)(?=notPunctSpace)";
-var We = k(Ke, "gu").replace(/notPunctSpace/g, Ge).replace(/punctSpace/g, ve).replace(/punct/g, ue).getRegex();
-var Xe = k(/\\(punct)/, "gu").replace(/punct/g, v).getRegex();
-var Je = k(/^<(scheme:[^\s\x00-\x1f<>]*|email)>/).replace("scheme", /[a-zA-Z][a-zA-Z0-9+.-]{1,31}/).replace("email", /[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+(@)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?![-_])/).getRegex();
-var Ve = k(j).replace("(?:-->|$)", "-->").getRegex();
-var Ye = k("^comment|^</[a-zA-Z][\\w:-]*\\s*>|^<[a-zA-Z][\\w-]*(?:attribute)*?\\s*/?>|^<\\?[\\s\\S]*?\\?>|^<![a-zA-Z]+\\s[\\s\\S]*?>|^<!\\[CDATA\\[[\\s\\S]*?\\]\\]>").replace("comment", Ve).replace("attribute", /\s+[a-zA-Z:_][\w.:-]*(?:\s*=\s*"[^"]*"|\s*=\s*'[^']*'|\s*=\s*[^\s"'=<>`]+)?/).getRegex();
-var D = /(?:\[(?:\\[\s\S]|[^\[\]\\])*\]|\\[\s\S]|`+[^`]*?`+(?!`)|[^\[\]\\`])*?/;
-var et = k(/^!?\[(label)\]\(\s*(href)(?:(?:[ \t]*(?:\n[ \t]*)?)(title))?\s*\)/).replace("label", D).replace("href", /<(?:\\.|[^\n<>\\])+>|[^ \t\n\x00-\x1f]*/).replace("title", /"(?:\\"?|[^"\\])*"|'(?:\\'?|[^'\\])*'|\((?:\\\)?|[^)\\])*\)/).getRegex();
-var he = k(/^!?\[(label)\]\[(ref)\]/).replace("label", D).replace("ref", F).getRegex();
-var ke = k(/^!?\[(ref)\](?:\[\])?/).replace("ref", F).getRegex();
-var tt = k("reflink|nolink(?!\\()", "g").replace("reflink", he).replace("nolink", ke).getRegex();
-var ne = /[hH][tT][tT][pP][sS]?|[fF][tT][pP]/;
-var W = { _backpedal: _, anyPunctuation: Xe, autolink: Je, blockSkip: He, br: oe, code: Ie, del: _, delLDelim: _, delRDelim: _, emStrongLDelim: Ze, emStrongRDelimAst: Qe, emStrongRDelimUnd: je, escape: Ae, link: et, nolink: ke, punctuation: Be, reflink: he, reflinkSearch: tt, tag: Ye, text: Ee, url: _ };
-var nt = { ...W, link: k(/^!?\[(label)\]\((.*?)\)/).replace("label", D).getRegex(), reflink: k(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label", D).getRegex() };
-var Z = { ...W, emStrongRDelimAst: Fe, emStrongLDelim: Ne, delLDelim: Ue, delRDelim: We, url: k(/^((?:protocol):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/).replace("protocol", ne).replace("email", /[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![-_])/).getRegex(), _backpedal: /(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/, del: /^(~~?)(?=[^\s~])((?:\\[\s\S]|[^\\])*?(?:\\[\s\S]|[^\s~\\]))\1(?=[^~]|$)/, text: k(/^([`~]+|[^`~])(?:(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|protocol:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)))/).replace("protocol", ne).getRegex() };
-var rt = { ...Z, br: k(oe).replace("{2,}", "*").getRegex(), text: k(Z.text).replace("\\b_", "\\b_| {2,}\\n").replace(/\{2,\}/g, "*").getRegex() };
-var E = { normal: U, gfm: ze, pedantic: Ce };
-var z = { normal: W, gfm: Z, breaks: rt, pedantic: nt };
-var st = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-var de = (u3) => st[u3];
+var Be = /(?!~)[\s\p{P}\p{S}]/u;
+var De = /(?:[^\s\p{P}\p{S}]|~)/u;
+var qe = k(/link|precode-code|html/, "g").replace("link", /\[(?:[^\[\]`]|(?<a>`+)[^`]+\k<a>(?!`))*?\]\((?:\\[\s\S]|[^\\\(\)]|\((?:\\[\s\S]|[^\\\(\)])*\))*\)/).replace("precode-", be ? "(?<!`)()" : "(^^|[^`])").replace("code", /(?<b>`+)[^`]+\k<b>(?!`)/).replace("html", /<(?! )[^<>]*?>/).getRegex();
+var ue = /^(?:\*+(?:((?!\*)punct)|([^\s*]))?)|^_+(?:((?!_)punct)|([^\s_]))?/;
+var ve = k(ue, "u").replace(/punct/g, z).getRegex();
+var He = k(ue, "u").replace(/punct/g, le).getRegex();
+var pe = "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)punctSpace(\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|notPunctSpace(\\*+)(?=notPunctSpace)";
+var Ze = k(pe, "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, z).getRegex();
+var Ge = k(pe, "gu").replace(/notPunctSpace/g, De).replace(/punctSpace/g, Be).replace(/punct/g, le).getRegex();
+var Ne = k("^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)punctSpace(_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)", "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, z).getRegex();
+var Qe = k(/^~~?(?:((?!~)punct)|[^\s~])/, "u").replace(/punct/g, z).getRegex();
+var je = "^[^~]+(?=[^~])|(?!~)punct(~~?)(?=[\\s]|$)|notPunctSpace(~~?)(?!~)(?=punctSpace|$)|(?!~)punctSpace(~~?)(?=notPunctSpace)|[\\s](~~?)(?!~)(?=punct)|(?!~)punct(~~?)(?!~)(?=punct)|notPunctSpace(~~?)(?=notPunctSpace)";
+var Fe = k(je, "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, z).getRegex();
+var Ue = k(/\\(punct)/, "gu").replace(/punct/g, z).getRegex();
+var Ke = k(/^<(scheme:[^\s\x00-\x1f<>]*|email)>/).replace("scheme", /[a-zA-Z][a-zA-Z0-9+.-]{1,31}/).replace("email", /[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+(@)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?![-_])/).getRegex();
+var We = k(U).replace("(?:-->|$)", "-->").getRegex();
+var Xe = k("^comment|^</[a-zA-Z][\\w:-]*\\s*>|^<[a-zA-Z][\\w-]*(?:attribute)*?\\s*/?>|^<\\?[\\s\\S]*?\\?>|^<![a-zA-Z]+\\s[\\s\\S]*?>|^<!\\[CDATA\\[[\\s\\S]*?\\]\\]>").replace("comment", We).replace("attribute", /\s+[a-zA-Z:_][\w.:-]*(?:\s*=\s*"[^"]*"|\s*=\s*'[^']*'|\s*=\s*[^\s"'=<>`]+)?/).getRegex();
+var q = /(?:\[(?:\\[\s\S]|[^\[\]\\])*\]|\\[\s\S]|`+(?!`)[^`]*?`+(?!`)|``+(?=\])|[^\[\]\\`])*?/;
+var Je = k(/^!?\[(label)\]\(\s*(href)(?:(?:[ \t]+(?:\n[ \t]*)?|\n[ \t]*)(title))?\s*\)/).replace("label", q).replace("href", /<(?:\\.|[^\n<>\\])+>|[^ \t\n\x00-\x1f]*/).replace("title", /"(?:\\"?|[^"\\])*"|'(?:\\'?|[^'\\])*'|\((?:\\\)?|[^)\\])*\)/).getRegex();
+var ce = k(/^!?\[(label)\]\[(ref)\]/).replace("label", q).replace("ref", F).getRegex();
+var he = k(/^!?\[(ref)\](?:\[\])?/).replace("ref", F).getRegex();
+var Ve = k("reflink|nolink(?!\\()", "g").replace("reflink", ce).replace("nolink", he).getRegex();
+var re = /[hH][tT][tT][pP][sS]?|[fF][tT][pP]/;
+var X = { _backpedal: _, anyPunctuation: Ue, autolink: Ke, blockSkip: qe, br: ae, code: Ie, del: _, delLDelim: _, delRDelim: _, emStrongLDelim: ve, emStrongRDelimAst: Ze, emStrongRDelimUnd: Ne, escape: Ee, link: Je, nolink: he, punctuation: Ce, reflink: ce, reflinkSearch: Ve, tag: Xe, text: Ae, url: _ };
+var Ye = { ...X, link: k(/^!?\[(label)\]\((.*?)\)/).replace("label", q).getRegex(), reflink: k(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label", q).getRegex() };
+var N = { ...X, emStrongRDelimAst: Ge, emStrongLDelim: He, delLDelim: Qe, delRDelim: Fe, url: k(/^((?:protocol):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/).replace("protocol", re).replace("email", /[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![-_])/).getRegex(), _backpedal: /(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/, del: /^(~~?)(?=[^\s~])((?:\\[\s\S]|[^\\])*?(?:\\[\s\S]|[^\s~\\]))\1(?=[^~]|$)/, text: k(/^([`~]+|[^`~])(?:(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|protocol:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)))/).replace("protocol", re).getRegex() };
+var et = { ...N, br: k(ae).replace("{2,}", "*").getRegex(), text: k(N.text).replace("\\b_", "\\b_| {2,}\\n").replace(/\{2,\}/g, "*").getRegex() };
+var B = { normal: K, gfm: Me, pedantic: ze };
+var E = { normal: X, gfm: N, breaks: et, pedantic: Ye };
+var tt = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+var ke = (u3) => tt[u3];
 function O(u3, e) {
   if (e) {
-    if (m.escapeTest.test(u3)) return u3.replace(m.escapeReplace, de);
-  } else if (m.escapeTestNoEncode.test(u3)) return u3.replace(m.escapeReplaceNoEncode, de);
+    if (m.escapeTest.test(u3)) return u3.replace(m.escapeReplace, ke);
+  } else if (m.escapeTestNoEncode.test(u3)) return u3.replace(m.escapeReplaceNoEncode, ke);
   return u3;
 }
-function X(u3) {
+function J(u3) {
   try {
     u3 = encodeURI(u3).replace(m.percentDecode, "%");
   } catch {
@@ -33694,7 +33748,7 @@ function X(u3) {
   }
   return u3;
 }
-function J(u3, e) {
+function V(u3, e) {
   let t = u3.replace(m.findPipe, (i, s, a) => {
     let o = false, l = s;
     for (; --l >= 0 && a[l] === "\\"; ) o = !o;
@@ -33705,7 +33759,7 @@ function J(u3, e) {
   for (; r < n.length; r++) n[r] = n[r].trim().replace(m.slashPipe, "|");
   return n;
 }
-function C(u3, e, t) {
+function I(u3, e, t) {
   let n = u3.length;
   if (n === 0) return "";
   let r = 0;
@@ -33717,7 +33771,7 @@ function C(u3, e, t) {
   }
   return u3.slice(0, n - r);
 }
-function ge(u3, e) {
+function de(u3, e) {
   if (u3.indexOf(e[1]) === -1) return -1;
   let t = 0;
   for (let n = 0; n < u3.length; n++) if (u3[n] === "\\") n++;
@@ -33725,7 +33779,7 @@ function ge(u3, e) {
   else if (u3[n] === e[1] && (t--, t < 0)) return n;
   return t > 0 ? -2 : -1;
 }
-function fe(u3, e = 0) {
+function ge(u3, e = 0) {
   let t = e, n = "";
   for (let r of u3) if (r === "	") {
     let i = 4 - t % 4;
@@ -33733,13 +33787,13 @@ function fe(u3, e = 0) {
   } else n += r, t++;
   return n;
 }
-function me(u3, e, t, n, r) {
+function fe(u3, e, t, n, r) {
   let i = e.href, s = e.title || null, a = u3[1].replace(r.other.outputLinkReplace, "$1");
   n.state.inLink = true;
   let o = { type: u3[0].charAt(0) === "!" ? "image" : "link", raw: t, href: i, title: s, text: a, tokens: n.inlineTokens(a) };
   return n.state.inLink = false, o;
 }
-function it(u3, e, t) {
+function nt(u3, e, t) {
   let n = u3.match(t.other.indentCodeCompensation);
   if (n === null) return e;
   let r = n[1];
@@ -33767,14 +33821,14 @@ var w = class {
     let t = this.rules.block.code.exec(e);
     if (t) {
       let n = t[0].replace(this.rules.other.codeRemoveIndent, "");
-      return { type: "code", raw: t[0], codeBlockStyle: "indented", text: this.options.pedantic ? n : C(n, `
+      return { type: "code", raw: t[0], codeBlockStyle: "indented", text: this.options.pedantic ? n : I(n, `
 `) };
     }
   }
   fences(e) {
     let t = this.rules.block.fences.exec(e);
     if (t) {
-      let n = t[0], r = it(n, t[3] || "", this.rules);
+      let n = t[0], r = nt(n, t[3] || "", this.rules);
       return { type: "code", raw: n, lang: t[2] ? t[2].trim().replace(this.rules.inline.anyPunctuation, "$1") : t[2], text: r };
     }
   }
@@ -33783,7 +33837,7 @@ var w = class {
     if (t) {
       let n = t[2].trim();
       if (this.rules.other.endingHash.test(n)) {
-        let r = C(n, "#");
+        let r = I(n, "#");
         (this.options.pedantic || !r || this.rules.other.endingSpaceChar.test(r)) && (n = r.trim());
       }
       return { type: "heading", raw: t[0], depth: t[1].length, text: n, tokens: this.lexer.inline(n) };
@@ -33791,13 +33845,13 @@ var w = class {
   }
   hr(e) {
     let t = this.rules.block.hr.exec(e);
-    if (t) return { type: "hr", raw: C(t[0], `
+    if (t) return { type: "hr", raw: I(t[0], `
 `) };
   }
   blockquote(e) {
     let t = this.rules.block.blockquote.exec(e);
     if (t) {
-      let n = C(t[0], `
+      let n = I(t[0], `
 `).split(`
 `), r = "", i = "", s = [];
       for (; n.length > 0; ) {
@@ -33844,25 +33898,25 @@ ${c}` : c;
         let l = false, p = "", c = "";
         if (!(t = s.exec(e)) || this.rules.block.hr.test(e)) break;
         p = t[0], e = e.substring(p.length);
-        let d = fe(t[2].split(`
+        let d = ge(t[2].split(`
 `, 1)[0], t[1].length), h = e.split(`
 `, 1)[0], R = !d.trim(), f = 0;
         if (this.options.pedantic ? (f = 2, c = d.trimStart()) : R ? f = t[1].length + 1 : (f = d.search(this.rules.other.nonSpaceChar), f = f > 4 ? 1 : f, c = d.slice(f), f += t[1].length), R && this.rules.other.blankLine.test(h) && (p += h + `
 `, e = e.substring(h.length + 1), l = true), !l) {
-          let S = this.rules.other.nextBulletRegex(f), V = this.rules.other.hrRegex(f), Y = this.rules.other.fencesBeginRegex(f), ee = this.rules.other.headingBeginRegex(f), xe = this.rules.other.htmlBeginRegex(f), be = this.rules.other.blockquoteBeginRegex(f);
+          let S = this.rules.other.nextBulletRegex(f), Y = this.rules.other.hrRegex(f), ee = this.rules.other.fencesBeginRegex(f), te = this.rules.other.headingBeginRegex(f), me = this.rules.other.htmlBeginRegex(f), xe = this.rules.other.blockquoteBeginRegex(f);
           for (; e; ) {
-            let G = e.split(`
+            let Z = e.split(`
 `, 1)[0], A;
-            if (h = G, this.options.pedantic ? (h = h.replace(this.rules.other.listReplaceNesting, "  "), A = h) : A = h.replace(this.rules.other.tabCharGlobal, "    "), Y.test(h) || ee.test(h) || xe.test(h) || be.test(h) || S.test(h) || V.test(h)) break;
+            if (h = Z, this.options.pedantic ? (h = h.replace(this.rules.other.listReplaceNesting, "  "), A = h) : A = h.replace(this.rules.other.tabCharGlobal, "    "), ee.test(h) || te.test(h) || me.test(h) || xe.test(h) || S.test(h) || Y.test(h)) break;
             if (A.search(this.rules.other.nonSpaceChar) >= f || !h.trim()) c += `
 ` + A.slice(f);
             else {
-              if (R || d.replace(this.rules.other.tabCharGlobal, "    ").search(this.rules.other.nonSpaceChar) >= 4 || Y.test(d) || ee.test(d) || V.test(d)) break;
+              if (R || d.replace(this.rules.other.tabCharGlobal, "    ").search(this.rules.other.nonSpaceChar) >= 4 || ee.test(d) || te.test(d) || Y.test(d)) break;
               c += `
 ` + h;
             }
-            R = !h.trim(), p += G + `
-`, e = e.substring(G.length + 1), d = A.slice(f);
+            R = !h.trim(), p += Z + `
+`, e = e.substring(Z.length + 1), d = A.slice(f);
           }
         }
         i.loose || (a ? i.loose = true : this.rules.other.doubleBlankLine.test(p) && (a = true)), i.items.push({ type: "list_item", raw: p, task: !!this.options.gfm && this.rules.other.listIsTask.test(c), loose: false, text: c, tokens: [] }), i.raw += p;
@@ -33912,18 +33966,21 @@ ${c}` : c;
   table(e) {
     let t = this.rules.block.table.exec(e);
     if (!t || !this.rules.other.tableDelimiter.test(t[2])) return;
-    let n = J(t[1]), r = t[2].replace(this.rules.other.tableAlignChars, "").split("|"), i = t[3]?.trim() ? t[3].replace(this.rules.other.tableRowBlankLine, "").split(`
+    let n = V(t[1]), r = t[2].replace(this.rules.other.tableAlignChars, "").split("|"), i = t[3]?.trim() ? t[3].replace(this.rules.other.tableRowBlankLine, "").split(`
 `) : [], s = { type: "table", raw: t[0], header: [], align: [], rows: [] };
     if (n.length === r.length) {
       for (let a of r) this.rules.other.tableAlignRight.test(a) ? s.align.push("right") : this.rules.other.tableAlignCenter.test(a) ? s.align.push("center") : this.rules.other.tableAlignLeft.test(a) ? s.align.push("left") : s.align.push(null);
       for (let a = 0; a < n.length; a++) s.header.push({ text: n[a], tokens: this.lexer.inline(n[a]), header: true, align: s.align[a] });
-      for (let a of i) s.rows.push(J(a, s.header.length).map((o, l) => ({ text: o, tokens: this.lexer.inline(o), header: false, align: s.align[l] })));
+      for (let a of i) s.rows.push(V(a, s.header.length).map((o, l) => ({ text: o, tokens: this.lexer.inline(o), header: false, align: s.align[l] })));
       return s;
     }
   }
   lheading(e) {
     let t = this.rules.block.lheading.exec(e);
-    if (t) return { type: "heading", raw: t[0], depth: t[2].charAt(0) === "=" ? 1 : 2, text: t[1], tokens: this.lexer.inline(t[1]) };
+    if (t) {
+      let n = t[1].trim();
+      return { type: "heading", raw: t[0], depth: t[2].charAt(0) === "=" ? 1 : 2, text: n, tokens: this.lexer.inline(n) };
+    }
   }
   paragraph(e) {
     let t = this.rules.block.paragraph.exec(e);
@@ -33951,10 +34008,10 @@ ${c}` : c;
       let n = t[2].trim();
       if (!this.options.pedantic && this.rules.other.startAngleBracket.test(n)) {
         if (!this.rules.other.endAngleBracket.test(n)) return;
-        let s = C(n.slice(0, -1), "\\");
+        let s = I(n.slice(0, -1), "\\");
         if ((n.length - s.length) % 2 === 0) return;
       } else {
-        let s = ge(t[2], "()");
+        let s = de(t[2], "()");
         if (s === -2) return;
         if (s > -1) {
           let o = (t[0].indexOf("!") === 0 ? 5 : 4) + t[1].length + s;
@@ -33966,7 +34023,7 @@ ${c}` : c;
         let s = this.rules.other.pedanticHrefTitle.exec(r);
         s && (r = s[1], i = s[3]);
       } else i = t[3] ? t[3].slice(1, -1) : "";
-      return r = r.trim(), this.rules.other.startAngleBracket.test(r) && (this.options.pedantic && !this.rules.other.endAngleBracket.test(n) ? r = r.slice(1) : r = r.slice(1, -1)), me(t, { href: r && r.replace(this.rules.inline.anyPunctuation, "$1"), title: i && i.replace(this.rules.inline.anyPunctuation, "$1") }, t[0], this.lexer, this.rules);
+      return r = r.trim(), this.rules.other.startAngleBracket.test(r) && (this.options.pedantic && !this.rules.other.endAngleBracket.test(n) ? r = r.slice(1) : r = r.slice(1, -1)), fe(t, { href: r && r.replace(this.rules.inline.anyPunctuation, "$1"), title: i && i.replace(this.rules.inline.anyPunctuation, "$1") }, t[0], this.lexer, this.rules);
     }
   }
   reflink(e, t) {
@@ -33977,13 +34034,13 @@ ${c}` : c;
         let s = n[0].charAt(0);
         return { type: "text", raw: s, text: s };
       }
-      return me(n, i, n[0], this.lexer, this.rules);
+      return fe(n, i, n[0], this.lexer, this.rules);
     }
   }
   emStrong(e, t, n = "") {
     let r = this.rules.inline.emStrongLDelim.exec(e);
-    if (!r || r[3] && n.match(this.rules.other.unicodeAlphaNumeric)) return;
-    if (!(r[1] || r[2] || "") || !n || this.rules.inline.punctuation.exec(n)) {
+    if (!r || !r[1] && !r[2] && !r[3] && !r[4] || r[4] && n.match(this.rules.other.unicodeAlphaNumeric)) return;
+    if (!(r[1] || r[3] || "") || !n || this.rules.inline.punctuation.exec(n)) {
       let s = [...r[0]].length - 1, a, o, l = s, p = 0, c = r[0][0] === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd;
       for (c.lastIndex = 0, t = t.slice(-1 * e.length + s); (r = c.exec(t)) != null; ) {
         if (a = r[1] || r[2] || r[3] || r[4] || r[5] || r[6], !a) continue;
@@ -34073,11 +34130,11 @@ var x = class u {
   tokenizer;
   constructor(e) {
     this.tokens = [], this.tokens.links = /* @__PURE__ */ Object.create(null), this.options = e || T, this.options.tokenizer = this.options.tokenizer || new w(), this.tokenizer = this.options.tokenizer, this.tokenizer.options = this.options, this.tokenizer.lexer = this, this.inlineQueue = [], this.state = { inLink: false, inRawBlock: false, top: true };
-    let t = { other: m, block: E.normal, inline: z.normal };
-    this.options.pedantic ? (t.block = E.pedantic, t.inline = z.pedantic) : this.options.gfm && (t.block = E.gfm, this.options.breaks ? t.inline = z.breaks : t.inline = z.gfm), this.tokenizer.rules = t;
+    let t = { other: m, block: B.normal, inline: E.normal };
+    this.options.pedantic ? (t.block = B.pedantic, t.inline = E.pedantic) : this.options.gfm && (t.block = B.gfm, this.options.breaks ? t.inline = E.breaks : t.inline = E.gfm), this.tokenizer.rules = t;
   }
   static get rules() {
-    return { block: E, inline: z };
+    return { block: B, inline: E };
   }
   static lex(e, t) {
     return new u(t).lex(e);
@@ -34095,7 +34152,7 @@ var x = class u {
     return this.inlineQueue = [], this.tokens;
   }
   blockTokens(e, t = [], n = false) {
-    for (this.options.pedantic && (e = e.replace(m.tabCharGlobal, "    ").replace(m.spaceLine, "")); e; ) {
+    for (this.tokenizer.lexer = this, this.options.pedantic && (e = e.replace(m.tabCharGlobal, "    ").replace(m.spaceLine, "")); e; ) {
       let r;
       if (this.options.extensions?.block?.some((s) => (r = s.call({ lexer: this }, e, t)) ? (e = e.substring(r.raw.length), t.push(r), true) : false)) continue;
       if (r = this.tokenizer.space(e)) {
@@ -34193,6 +34250,7 @@ var x = class u {
     return this.inlineQueue.push({ src: e, tokens: t }), t;
   }
   inlineTokens(e, t = []) {
+    this.tokenizer.lexer = this;
     let n = e, r = null;
     if (this.tokens.links) {
       let o = Object.keys(this.tokens.links);
@@ -34373,7 +34431,7 @@ ${e}</tr>
     return `<del>${this.parser.parseInline(e)}</del>`;
   }
   link({ href: e, title: t, tokens: n }) {
-    let r = this.parser.parseInline(n), i = X(e);
+    let r = this.parser.parseInline(n), i = J(e);
     if (i === null) return r;
     e = i;
     let s = '<a href="' + e + '"';
@@ -34381,7 +34439,7 @@ ${e}</tr>
   }
   image({ href: e, title: t, text: n, tokens: r }) {
     r && (n = this.parser.parseInline(r, this.parser.textRenderer));
-    let i = X(e);
+    let i = J(e);
     if (i === null) return O(n);
     e = i;
     let s = `<img src="${e}" alt="${O(n)}"`;
@@ -34437,6 +34495,7 @@ var b = class u2 {
     return new u2(t).parseInline(e);
   }
   parse(e) {
+    this.renderer.parser = this;
     let t = "";
     for (let n = 0; n < e.length; n++) {
       let r = e[n];
@@ -34507,6 +34566,7 @@ var b = class u2 {
     return t;
   }
   parseInline(e, t = this.renderer) {
+    this.renderer.parser = this;
     let n = "";
     for (let r = 0; r < e.length; r++) {
       let i = e[r];
@@ -34600,7 +34660,7 @@ var P = class {
     return this.block ? b.parse : b.parseInline;
   }
 };
-var B = class {
+var D = class {
   defaults = M();
   options = this.setOptions;
   parse = this.parseMarkdown(true);
@@ -34761,17 +34821,17 @@ Please report this to https://github.com/markedjs/marked.`, e) {
     };
   }
 };
-var L = new B();
+var L = new D();
 function g(u3, e) {
   return L.parse(u3, e);
 }
 g.options = g.setOptions = function(u3) {
-  return L.setOptions(u3), g.defaults = L.defaults, H(g.defaults), g;
+  return L.setOptions(u3), g.defaults = L.defaults, G(g.defaults), g;
 };
 g.getDefaults = M;
 g.defaults = T;
 g.use = function(...u3) {
-  return L.use(...u3), g.defaults = L.defaults, H(g.defaults), g;
+  return L.use(...u3), g.defaults = L.defaults, G(g.defaults), g;
 };
 g.walkTokens = function(u3, e) {
   return L.walkTokens(u3, e);
@@ -34786,13 +34846,13 @@ g.lexer = x.lex;
 g.Tokenizer = w;
 g.Hooks = P;
 g.parse = g;
-var Ut = g.options;
-var Kt = g.setOptions;
-var Wt = g.use;
-var Xt = g.walkTokens;
-var Jt = g.parseInline;
-var Yt = b.parse;
-var en = x.lex;
+var Qt = g.options;
+var jt = g.setOptions;
+var Ft = g.use;
+var Ut = g.walkTokens;
+var Kt = g.parseInline;
+var Xt = b.parse;
+var Jt = x.lex;
 
 // src/expression/helpers.ts
 function extractFromText(pattern, text) {
@@ -34898,11 +34958,11 @@ async function run() {
       debug(`  - Integration secret: configured`);
     }
     const eventName = context2.eventName;
-    const isPR = eventName === "pull_request";
+    const isPR = eventName === "pull_request" || eventName === "pull_request_review";
     const isIssue = eventName === "issues";
     if (!isPR && !isIssue) {
       warning(
-        `Unsupported event: ${eventName}. Only pull_request and issues events are supported.`
+        `Unsupported event: ${eventName}. Only pull_request, pull_request_review, and issues events are supported.`
       );
       return;
     }
@@ -35093,4 +35153,3 @@ undici/lib/web/websocket/frame.js:
 js-yaml/dist/js-yaml.mjs:
   (*! js-yaml 4.1.1 https://github.com/nodeca/js-yaml @license MIT *)
 */
-//# sourceMappingURL=index.js.map
