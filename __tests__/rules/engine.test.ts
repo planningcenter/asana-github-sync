@@ -623,3 +623,196 @@ describe('buildRuleContext - issues event', () => {
     ).toThrow('No issue in GitHub payload');
   });
 });
+
+// ── pull_request_review event support ────────────────────────────────────────
+
+describe('buildRuleContext - pull_request_review event', () => {
+  beforeEach(() => {
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
+  });
+
+  const makeReviewPayload = (overrides: Record<string, unknown> = {}) => ({
+    eventName: 'pull_request_review' as const,
+    payload: {
+      action: 'submitted',
+      review: {
+        state: 'approved',
+        user: { login: 'reviewer' },
+      },
+      pull_request: {
+        number: 99,
+        title: 'Feature: add reviews',
+        body: 'Implements review support',
+        merged: false,
+        draft: false,
+        user: { login: 'author' },
+        assignee: { login: 'assignee' },
+        base: { ref: 'main' },
+        head: { ref: 'feat/reviews' },
+        html_url: 'https://github.com/owner/repo/pull/99',
+        labels: [{ name: '+1' }],
+        ...overrides,
+      },
+    },
+  });
+
+  test('builds PR context from pull_request_review payload', () => {
+    const ctx = buildRuleContext(makeReviewPayload(), undefined, true);
+
+    expect(ctx.eventName).toBe('pull_request_review');
+    expect(ctx.action).toBe('submitted');
+    expect(ctx.pr).toBeDefined();
+    expect(ctx.pr!.number).toBe(99);
+    expect(ctx.pr!.title).toBe('Feature: add reviews');
+    expect(ctx.pr!.author).toBe('author');
+    expect(ctx.pr!.base_ref).toBe('main');
+    expect(ctx.pr!.head_ref).toBe('feat/reviews');
+    expect(ctx.pr!.url).toBe('https://github.com/owner/repo/pull/99');
+    expect(ctx.issue).toBeUndefined();
+  });
+
+  test('extracts review state from payload', () => {
+    const ctx = buildRuleContext(makeReviewPayload(), undefined, true);
+
+    expect(ctx.review).toBeDefined();
+    expect(ctx.review!.state).toBe('approved');
+  });
+
+  test('does not set review when review missing from payload', () => {
+    const ctx = buildRuleContext(
+      {
+        eventName: 'pull_request' as const,
+        payload: {
+          action: 'opened',
+          pull_request: {
+            number: 1,
+            title: 'Test',
+            body: '',
+            merged: false,
+            draft: false,
+            user: { login: 'author' },
+            assignee: null,
+            base: { ref: 'main' },
+            head: { ref: 'feat' },
+            html_url: 'https://github.com/owner/repo/pull/1',
+            labels: [],
+          },
+        },
+      },
+      undefined,
+      false
+    );
+
+    expect(ctx.review).toBeUndefined();
+  });
+
+  test('extracts labels from pull_request_review payload', () => {
+    const ctx = buildRuleContext(makeReviewPayload(), undefined, true);
+
+    expect(ctx.labels).toEqual(['+1']);
+  });
+
+  test('throws when pull_request missing from pull_request_review payload', () => {
+    expect(() =>
+      buildRuleContext(
+        { eventName: 'pull_request_review', payload: { action: 'submitted' } },
+        undefined,
+        false
+      )
+    ).toThrow('No pull_request in GitHub payload');
+  });
+});
+
+describe('matchesCondition - pull_request_review event', () => {
+  let reviewContext: RuleContext;
+
+  beforeEach(() => {
+    infoSpy.mockClear();
+    errorSpy.mockClear();
+    warningSpy.mockClear();
+    debugSpy.mockClear();
+
+    reviewContext = {
+      eventName: 'pull_request_review',
+      action: 'submitted',
+      pr: {
+        number: 99,
+        title: 'Feature: add reviews',
+        body: 'Implements review support',
+        merged: false,
+        draft: false,
+        author: 'author',
+        assignee: 'assignee',
+        base_ref: 'main',
+        head_ref: 'feat/reviews',
+        url: 'https://github.com/owner/repo/pull/99',
+      },
+      review: { state: 'approved' },
+      label: { name: '+1' },
+      labels: ['+1'],
+      hasAsanaTasks: true,
+    };
+  });
+
+  test('matches pull_request_review event', () => {
+    const condition: Condition = { event: 'pull_request_review' };
+    expect(matchesCondition(condition, reviewContext)).toBe(true);
+  });
+
+  test('does not match pull_request condition against pull_request_review event', () => {
+    const condition: Condition = { event: 'pull_request' };
+    expect(matchesCondition(condition, reviewContext)).toBe(false);
+  });
+
+  test('matches pull_request_review with action', () => {
+    const condition: Condition = { event: 'pull_request_review', action: 'submitted' };
+    expect(matchesCondition(condition, reviewContext)).toBe(true);
+  });
+
+  test('matches pull_request_review with label', () => {
+    const condition: Condition = { event: 'pull_request_review', action: 'submitted', label: '+1' };
+    expect(matchesCondition(condition, reviewContext)).toBe(true);
+  });
+
+  test('does not match when label differs', () => {
+    const condition: Condition = { event: 'pull_request_review', label: '-1' };
+    expect(matchesCondition(condition, reviewContext)).toBe(false);
+  });
+
+  test('matches review_state condition', () => {
+    const condition: Condition = { event: 'pull_request_review', review_state: 'approved' };
+    expect(matchesCondition(condition, reviewContext)).toBe(true);
+  });
+
+  test('does not match when review_state differs', () => {
+    const condition: Condition = { event: 'pull_request_review', review_state: 'changes_requested' };
+    expect(matchesCondition(condition, reviewContext)).toBe(false);
+  });
+
+  test('matches review_state as array', () => {
+    const condition: Condition = { event: 'pull_request_review', review_state: ['approved', 'commented'] };
+    expect(matchesCondition(condition, reviewContext)).toBe(true);
+  });
+
+  test('does not match review_state when no review in context', () => {
+    const noReviewContext = { ...reviewContext, review: undefined };
+    const condition: Condition = { event: 'pull_request_review', review_state: 'approved' };
+    expect(matchesCondition(condition, noReviewContext)).toBe(false);
+  });
+
+  test('PR template variables are accessible', () => {
+    const rules: Rule[] = [
+      {
+        when: { event: 'pull_request_review', action: 'submitted' },
+        then: { update_fields: { '1234': 'Reviewed: PR-{{pr.number}}' } },
+      },
+    ];
+
+    const { fieldUpdates } = executeRules(rules, reviewContext);
+
+    expect(fieldUpdates.get('1234')).toBe('Reviewed: PR-99');
+  });
+});

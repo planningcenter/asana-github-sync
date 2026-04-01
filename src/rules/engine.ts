@@ -37,6 +37,9 @@ export interface RuleContext {
     url: string
     state: string
   }
+  review?: {
+    state: string
+  }
   label?: {
     name: string
   }
@@ -69,7 +72,7 @@ export function buildRuleContext(
     hasAsanaTasks,
   }
 
-  if (eventName === "pull_request") {
+  if (eventName === "pull_request" || eventName === "pull_request_review") {
     const pr = payload.pull_request
     if (!pr) {
       throw new Error("No pull_request in GitHub payload")
@@ -85,6 +88,9 @@ export function buildRuleContext(
       base_ref: pr.base.ref,
       head_ref: pr.head.ref,
       url: pr.html_url || "",
+    }
+    if (payload.review?.state) {
+      context.review = { state: payload.review.state }
     }
     if (payload.label) {
       context.label = { name: payload.label.name }
@@ -113,7 +119,9 @@ export function buildRuleContext(
       context.labels = issue.labels.map((label: { name: string }) => label.name)
     }
   } else {
-    throw new Error(`Unsupported event: ${eventName}. Supported events: pull_request, issues`)
+    throw new Error(
+      `Unsupported event: ${eventName}. Supported events: pull_request, pull_request_review, issues`
+    )
   }
 
   if (comments !== undefined) {
@@ -165,6 +173,19 @@ export function matchesCondition(condition: Condition, context: RuleContext): bo
   // Label (if specified) must match
   if (condition.label !== undefined) {
     if (!context.label || condition.label !== context.label.name) {
+      return false
+    }
+  }
+
+  // Review state (if specified) - only applies to pull_request_review events
+  if (condition.review_state !== undefined) {
+    if (!context.review) {
+      return false
+    }
+    const states = Array.isArray(condition.review_state)
+      ? condition.review_state
+      : [condition.review_state]
+    if (!states.includes(context.review.state)) {
       return false
     }
   }

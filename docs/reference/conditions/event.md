@@ -24,13 +24,14 @@ when:
 | Event | Support | Description |
 |-------|---------|-------------|
 | `pull_request` | ✅ **Primary** | PR opened, closed, edited, labeled, etc. Full PR context and all features. |
+| `pull_request_review` | ✅ **Supported** | PR review submitted, edited, dismissed. Full PR context extracted from payload. |
 | `issues` | ✅ **Supported** | Issue opened, closed, labeled, etc. Full issue context and task creation. |
 | `pull_request_target` | ⚠️ Limited | Similar to `pull_request` but runs in base branch context. |
 | `push` | ❌ Unsupported | No PR or issue context available. |
 | `issue_comment` | ❌ Unsupported | No PR or issue context available. |
 
 ::: tip
-**`pull_request` and `issues` are the two supported events.** Both provide full context and support all relevant features. The action returns early with a warning for any other event type.
+**`pull_request`, `pull_request_review`, and `issues` are the supported events.** All provide full context and support all relevant features. The action returns early with a warning for any other event type.
 :::
 
 For a complete list of GitHub events, see:
@@ -49,6 +50,21 @@ rules:
     then:
       update_fields:
         '1234567890': 'In Progress'
+```
+
+### PR Review Event
+
+Update an Asana field when a pull request review is submitted:
+
+```yaml
+rules:
+  - when:
+      event: pull_request_review
+      action: submitted
+      review_state: approved
+    then:
+      update_fields:
+        '1234567890': 'Code Approved'
 ```
 
 ### Issues Event
@@ -71,13 +87,15 @@ rules:
 
 ## Workflow Configuration
 
-The `event` in your rule must match an event in your workflow's `on:` section. To handle both PRs and issues, listen for both events:
+The `event` in your rule must match an event in your workflow's `on:` section. To handle PRs, PR reviews, and issues, listen for all relevant events:
 
 ```yaml
 # .github/workflows/asana-sync.yml
 on:
   pull_request:
     types: [opened, closed, labeled, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
   issues:
     types: [opened, closed, labeled, reopened]
 
@@ -183,4 +201,5 @@ rules:
 ## See Also
 
 - [action](/reference/conditions/action) - Filter by specific event actions
+- [review_state](/reference/conditions/review-state) - Filter by review state (approved, changes_requested, commented)
 - [Workflow Triggers](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows) - All GitHub event types
