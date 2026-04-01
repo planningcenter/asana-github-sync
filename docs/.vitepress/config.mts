@@ -6,6 +6,16 @@ export default defineConfig({
   base: '/asana-github-sync/',
   ignoreDeadLinks: true, // TODO: Remove once all pages are created
 
+  markdown: {
+    config(md) {
+      const defaultCodeInline = md.renderer.rules.code_inline!
+      md.renderer.rules.code_inline = (tokens, idx, options, env, self) => {
+        tokens[idx].attrSet('v-pre', '')
+        return defaultCodeInline(tokens, idx, options, env, self)
+      }
+    },
+  },
+
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/' },
