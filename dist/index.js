@@ -33108,12 +33108,13 @@ function findEnumOption(customField, stateName, customFieldGid) {
     );
     return null;
   }
-  const matchingOption = enumOptions.find(
+  const enabledOptions = enumOptions.filter((opt) => opt.enabled);
+  const matchingOption = enabledOptions.find(
     (opt) => opt.name === stateName
   );
   if (!matchingOption) {
     error(
-      `State "${stateName}" not found in custom field ${customFieldGid}. Available options: ${enumOptions.map((o) => o.name).join(", ")}`
+      `State "${stateName}" not found in custom field ${customFieldGid}. Available options: ${enabledOptions.map((o) => o.name).join(", ")}`
     );
     return null;
   }
@@ -35153,3 +35154,4 @@ undici/lib/web/websocket/frame.js:
 js-yaml/dist/js-yaml.mjs:
   (*! js-yaml 4.1.1 https://github.com/nodeca/js-yaml @license MIT *)
 */
+//# sourceMappingURL=index.js.map
