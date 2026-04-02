@@ -222,6 +222,39 @@ describe('Asana Task Updates', () => {
       );
     });
 
+    test('skips disabled enum options', async () => {
+      const taskGid = 'task-123';
+      const fieldUpdates = new Map([['field-1', 'release 1.2']]);
+
+      server.use(
+        http.get(`${ASANA_API_BASE}/custom_fields/field-1`, () => {
+          return HttpResponse.json({
+            data: {
+              gid: 'field-1',
+              name: 'Release',
+              type: 'enum',
+              enum_options: [
+                { gid: 'opt-1', name: 'release 1.2', enabled: false },
+                { gid: 'opt-2', name: 'release 1.3', enabled: true },
+              ],
+            },
+          });
+        })
+      );
+
+      await updateTaskFields(taskGid, fieldUpdates, mockAsanaToken);
+      expect(core.error).toHaveBeenCalledWith(
+        expect.stringContaining('"release 1.2" not found')
+      );
+      // Error message should only list enabled options
+      expect(core.error).toHaveBeenCalledWith(
+        expect.stringContaining('release 1.3')
+      );
+      expect(core.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('release 1.2\n')
+      );
+    });
+
     test('handles field fetch error gracefully', async () => {
       const taskGid = 'task-123';
       const fieldUpdates = new Map([['field-1', 'Done']]);

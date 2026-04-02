@@ -74,14 +74,15 @@ function findEnumOption(
     return null
   }
 
-  const matchingOption: AsanaEnumOption | undefined = enumOptions.find(
+  const enabledOptions = enumOptions.filter((opt) => opt.enabled)
+  const matchingOption: AsanaEnumOption | undefined = enabledOptions.find(
     (opt) => opt.name === stateName
   )
 
   if (!matchingOption) {
     core.error(
       `State "${stateName}" not found in custom field ${customFieldGid}. ` +
-        `Available options: ${enumOptions.map((o) => o.name).join(", ")}`
+        `Available options: ${enabledOptions.map((o) => o.name).join(", ")}`
     )
     return null
   }
