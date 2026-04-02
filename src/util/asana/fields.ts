@@ -1,5 +1,6 @@
 /**
  * Custom field operations - schema fetching, caching, and value coercion
+ * @module
  */
 
 import * as core from "@actions/core"
