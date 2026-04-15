@@ -417,6 +417,104 @@ describe('Handlebars Extraction Helpers', () => {
     });
   });
 
+  describe('sanitize_markdown', () => {
+    const compile = (md: string) => Handlebars.compile('{{sanitize_markdown text}}')({ text: md });
+
+    test('passes plain text through', () => {
+      expect(compile('hello world')).toBe('hello world');
+    });
+
+    test('returns empty string for empty input', () => {
+      expect(compile('')).toBe('');
+    });
+
+    test('strips standalone markdown images', () => {
+      const result = compile('before\n![screenshot](https://example.com/img.png)\nafter');
+      expect(result).not.toContain('![');
+      expect(result).not.toContain('example.com/img.png');
+      expect(result).toContain('before');
+      expect(result).toContain('after');
+    });
+
+    test('strips linked markdown images', () => {
+      const result = compile('[![badge](https://example.com/badge.png)](https://example.com)');
+      expect(result).not.toContain('![');
+      expect(result).not.toContain('badge.png');
+    });
+
+    test('strips raw HTML <img> tags', () => {
+      const body = 'before\n<img width="2964" height="1284" alt="screenshot" src="https://github.com/user-attachments/assets/abc123" />\nafter';
+      const result = compile(body);
+      expect(result).not.toContain('<img');
+      expect(result).not.toContain('abc123');
+      expect(result).toContain('before');
+      expect(result).toContain('after');
+    });
+
+    test('strips self-closing <img> without trailing slash', () => {
+      expect(compile('<img src="https://example.com/image.png" alt="test">')).not.toContain('<img');
+    });
+
+    test('strips <p> open tags', () => {
+      expect(compile('<p>some text</p>')).not.toContain('<p');
+    });
+
+    test('converts </p> to a newline', () => {
+      const result = compile('<p>first</p><p>second</p>');
+      expect(result).toContain('first');
+      expect(result).toContain('second');
+      expect(result).not.toContain('<p');
+      expect(result).not.toContain('</p>');
+      expect(result).toContain('\n');
+    });
+
+    test('handles </p> with whitespace before closing angle bracket', () => {
+      const result = compile('<p>first</p ><p>second</p >');
+      expect(result).not.toContain('</p');
+      expect(result).toContain('\n');
+    });
+
+    test('removes <details> blocks entirely', () => {
+      const result = compile('<details><summary>Expand</summary>hidden content</details>');
+      expect(result).not.toContain('<details');
+      expect(result).not.toContain('hidden content');
+    });
+
+    test('converts <br> to newline', () => {
+      const result = compile('line one<br/>line two');
+      expect(result).toContain('line one\nline two');
+      expect(result).not.toContain('<br');
+    });
+
+    test('normalizes Windows line endings', () => {
+      expect(compile('a\r\nb')).toBe('a\nb');
+    });
+
+    test('collapses 3+ consecutive newlines to 2', () => {
+      expect(compile('a\n\n\n\nb')).toBe('a\n\nb');
+    });
+
+    test('handles a typical PR body with embedded screenshot', () => {
+      const body = [
+        '## Summary',
+        '',
+        '- Fixed the bug',
+        '',
+        '<img width="800" alt="image" src="https://github.com/user-attachments/assets/abc" />',
+        '',
+        '## Test plan',
+        '',
+        '- [ ] Verify fix',
+      ].join('\n');
+
+      const result = compile(body);
+      expect(result).not.toContain('<img');
+      expect(result).toContain('## Summary');
+      expect(result).toContain('## Test plan');
+      expect(result).toContain('- Fixed the bug');
+    });
+  });
+
   describe('markdown_to_html', () => {
     const compile = (md: string) => Handlebars.compile('{{markdown_to_html text}}')({ text: md });
 
