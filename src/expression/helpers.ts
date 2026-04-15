@@ -90,6 +90,12 @@ export function registerHelpers(): void {
         .replace(/\[\/\/\]: # \([^)]*\)/g, "")
         // Remove <details> tags and content
         .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, "")
+        // Remove <img> tags — Asana only supports Asana-hosted images with data-asana-gid;
+        // external URLs (e.g. GitHub screenshot embeds) cause a 400 from the API
+        .replace(/<img\b[^>]*\/?>/gi, "")
+        // Remove <p> tags (not supported by Asana; use newlines instead)
+        .replace(/<\/p\s*>/gi, "\n")
+        .replace(/<p\b[^>]*>/gi, "")
         // Convert <br> to newlines
         .replace(/<br\s*\/?>/gi, "\n")
         // Normalize line endings
