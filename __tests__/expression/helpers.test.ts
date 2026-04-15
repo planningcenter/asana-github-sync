@@ -474,6 +474,14 @@ describe('Handlebars Extraction Helpers', () => {
       expect(result).toContain('\n');
     });
 
+    test('does not strip <pre> tags (word boundary regression)', () => {
+      const raw = (md: string) => Handlebars.compile('{{{sanitize_markdown text}}}')({ text: md });
+      const result = raw('before <pre>code block</pre> after');
+      expect(result).toContain('<pre>');
+      expect(result).toContain('</pre>');
+      expect(result).toContain('code block');
+    });
+
     test('removes <details> blocks entirely', () => {
       const result = compile('<details><summary>Expand</summary>hidden content</details>');
       expect(result).not.toContain('<details');
